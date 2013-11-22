@@ -1,4 +1,4 @@
 AvoisionJS
 ==========
 
-Avoision (a fast-paced block-dodging game) port to HTML5
+HTML port of Avoision (a fast-paced block-dodging game).
