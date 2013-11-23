@@ -25,21 +25,32 @@ function reset() {
     player.y = canvas.height / 2;
 }
 
+var keyNameToCode = {
+    backspace: 8,
+    tab: 9,
+    enter: 13,
+    escape: 27,
+    space: 32,
+    left: 37,
+    up: 38,
+    right: 39,
+    down: 40
+};
+
 function update(delta) {
-    // TODO: These numbers must be in an enum, right?
-    if (38 in keysPressed) {
+    if (keyNameToCode.up in keysPressed) {
         player.y -= player.speed * delta;
     }
 
-    if (40 in keysPressed) {
+    if (keyNameToCode.down in keysPressed) {
         player.y += player.speed * delta;
     }
 
-    if (37 in keysPressed) {
+    if (keyNameToCode.left in keysPressed) {
         player.x -= player.speed * delta;
     }
 
-    if (39 in keysPressed) {
+    if (keyNameToCode.right in keysPressed) {
         player.x += player.speed * delta;
     }
 }
