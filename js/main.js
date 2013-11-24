@@ -94,14 +94,19 @@ function Layer() {
     this.entities = [];
     // TODO: Should this be a full-blown Event? Or just a simple callback?
     this.keyPressed = new Event();
-    this.lastUpdate = Date.now();
 }
 
 Layer.prototype = {
     constructor: Layer,
 
-    update: function (delta) {
-        // TODO: Update entities
+    update: function () {
+        var now = Date.now();
+        if (this.lastUpdate && this.lastUpdate < now) {
+            var delta = now - this.lastUpdate;
+            // TODO: Update entities
+        }
+
+        this.lastUpdate = now;
     },
 
     addEntity: function(entity) {
@@ -112,17 +117,6 @@ Layer.prototype = {
         context.fillStyle = 'black';
         context.fillRect(0, 0, canvas.width, canvas.height);
         // TODO: Draw entities
-    },
-
-    // TODO: How much to do here vs. in layers?
-    mainLoop: function () {
-        var now = Date.now();
-        if (this.lastUpdate) {
-            var delta = now - this.lastUpdate;
-            // TODO: Update everything here
-        }
-
-        this.lastUpdate = now;
     }
 };
 
@@ -143,6 +137,8 @@ Entity.prototype = {
 // Layers handles a stack of layers (only the top one is visible/running)
 var layers = new function () {
     var list = [];
+    var canvas;
+    var context;
 
     // TODO: Shown handlers, etc.
     this.push = function (layer) {
@@ -153,19 +149,34 @@ var layers = new function () {
         list.shift();
     };
 
-    this.loop = function () {
+    var loop = function () {
         var activeLayer = list[0];
+        // TODO: Handle switching layers
         if (activeLayer) {
-            activeLayer.mainLoop();
+            activeLayer.update();
+            activeLayer.draw(canvas, context);
+            // TODO: Event handling
         }
+
+        // TODO: setInterval or requestAnimationFrame?
+        requestAnimationFrame(loop);
     };
+
+    this.runMainLoop = function (newCanvas, newContext) {
+        canvas = newCanvas;
+        context = newContext;
+        loop();
+    }
 };
 
+// TODO: Better sizing (and support resizing)
 var canvas = document.createElement('canvas');
-var ctx = canvas.getContext('2d');
 canvas.width = 640;
 canvas.height = 480;
 document.body.appendChild(canvas);
+
+layers.push(new Layer());
+layers.runMainLoop(canvas, canvas.getContext('2d'));
 
 //reset();
 //var then = Date.now();
