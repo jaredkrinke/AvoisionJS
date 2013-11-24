@@ -31,6 +31,13 @@ var keyNameToCode = {
     down: 40
 };
 
+var keyCodeToName = {};
+(function () {
+    for (var name in keyNameToCode) {
+        keyCodeToName[keyNameToCode[name]] = name;
+    }
+})();
+
 function update(delta) {
     if (keyNameToCode.up in keysPressed) {
         player.y -= player.speed * delta;
@@ -109,8 +116,9 @@ Layer.prototype = {
 
         this.forEachEntity(function (entity) {
             // TODO: Draw entities based on elements
+            // TODO: Add in a transformation for both proper scaling and inverting the y-axis
             context.fillStyle = 'green';
-            context.fillRect(entity.x - 16, entity.y - 16, 32, 32);
+            context.fillRect(entity.x - 16, canvas.height - (entity.y + 16), 32, 32);
         });
     }
 };
@@ -129,8 +137,41 @@ Entity.prototype = {
     // TODO?
 };
 
+// Serializes key presses so that they show up predictably between frames
+function KeySerializer() {
+    var queuedKeyCodes = [];
+    var queuedKeyStates = [];
+
+    addEventListener("keydown", function (e) {
+        if (e.keyCode in keyCodeToName) {
+            queuedKeyCodes.push(e.keyCode);
+            queuedKeyStates.push(true);
+        }
+    }, false);
+
+    addEventListener("keyup", function (e) {
+        if (e.keyCode in keyCodeToName) {
+            queuedKeyCodes.push(e.keyCode);
+            queuedKeyStates.push(false);
+        }
+    }, false);
+
+    this.process = function (keyPressed) {
+        var count = queuedKeyCodes.length;
+        if (count > 0) {
+            for (var i = 0; i < count; i++) {
+                keyPressed(keyCodeToName[queuedKeyCodes[i]], queuedKeyStates[i]);
+            }
+
+            queuedKeyCodes.length = 0;
+            queuedKeyStates.length = 0;
+        }
+    };
+}
+
 // Layers handles a stack of layers (only the top one is visible/running)
 var layers = new function () {
+    var keySerializer = new KeySerializer();
     var list = [];
     var canvas;
     var context;
@@ -144,13 +185,23 @@ var layers = new function () {
         list.shift();
     };
 
+    // Single loop iteration
     var loop = function () {
         var activeLayer = list[0];
         // TODO: Handle switching layers
         if (activeLayer) {
+            // Handle input
+            var keyPressed = activeLayer.keyPressed;
+            keySerializer.process(function (key, pressed) {
+                var keyPressedHandler = keyPressed[key];
+                if (keyPressedHandler) {
+                    keyPressedHandler(pressed);
+                }
+            });
+
+            // Update entities and draw everything
             activeLayer.update();
             activeLayer.draw(canvas, context);
-            // TODO: Event handling
         }
 
         // TODO: setInterval or requestAnimationFrame?
@@ -158,8 +209,11 @@ var layers = new function () {
     };
 
     this.runMainLoop = function (newCanvas, newContext) {
+        // Initialization
         canvas = newCanvas;
         context = newContext;
+
+        // Start looping
         loop();
     }
 };
@@ -173,8 +227,32 @@ document.body.appendChild(canvas);
 var entity = new Entity();
 entity.x = 320;
 entity.y = 240;
+entity.vx = 0;
+entity.vy = 0;
+entity.update = function (ms) {
+    entity.x += entity.vx * ms;
+    entity.y += entity.vy * ms;
+}
 var testLayer = new Layer();
 testLayer.addEntity(entity);
+testLayer.keyPressed = {
+    left: function (pressed) {
+        entity.vx = pressed ? -0.1 : 0;
+    },
+
+    right: function (pressed) {
+        entity.vx = pressed ? 0.1 : 0;
+    },
+
+    up: function (pressed) {
+        entity.vy = pressed ? 0.1 : 0;
+    },
+
+    down: function (pressed) {
+        entity.vy = pressed ? -0.1 : 0;
+    }
+};
+
 layers.push(testLayer);
 layers.runMainLoop(canvas, canvas.getContext('2d'));
 
