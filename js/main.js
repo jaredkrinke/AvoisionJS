@@ -163,35 +163,40 @@ document.body.appendChild(canvas);
 var entity = new Entity();
 entity.x = 320;
 entity.y = 240;
-entity.vx = 0;
-entity.vy = 0;
 entity.update = function (ms) {
-    entity.x += entity.vx * ms;
-    entity.y += entity.vy * ms;
+    if (entity.movingLeft) {
+        entity.x -= 0.1 * ms;
+    }
+    if (entity.movingRight) {
+        entity.x += 0.1 * ms;
+    }
+    if (entity.movingUp) {
+        entity.y += 0.1 * ms;
+    }
+    if (entity.movingDown) {
+        entity.y -= 0.1 * ms;
+    }
 }
+
 var testLayer = new Layer();
 testLayer.addEntity(entity);
 testLayer.keyPressed = {
     left: function (pressed) {
-        entity.vx = pressed ? -0.1 : 0;
+        entity.movingLeft = pressed;
     },
 
     right: function (pressed) {
-        entity.vx = pressed ? 0.1 : 0;
+        entity.movingRight = pressed;
     },
 
     up: function (pressed) {
-        entity.vy = pressed ? 0.1 : 0;
+        entity.movingUp = pressed;
     },
 
     down: function (pressed) {
-        entity.vy = pressed ? -0.1 : 0;
+        entity.movingDown = pressed;
     }
 };
 
 layers.push(testLayer);
 layers.runMainLoop(canvas, canvas.getContext('2d'));
-
-//reset();
-//var then = Date.now();
-//mainLoop();
