@@ -67,56 +67,51 @@ var mainLoop = function () {
     requestAnimationFrame(mainLoop);
 }
 
-// Event source
-function Event() {
-    this.callbacks = [];
-}
-
-Event.prototype = {
-    constructor: Event,
-
-    addListener: function (callback) {
-        this.callbacks.push(callback);
-    },
-
-
-    fire: function () {
-        var callbacks = this.callbacks;
-        var length = callbacks.length;
-        for (var i = 0; i < length; i++) {
-            callbacks[i].apply(null, arguments);
-        }
-    }
-};
-
 // Layer that contains entities to display/update
 function Layer() {
     this.entities = [];
-    // TODO: Should this be a full-blown Event? Or just a simple callback?
-    this.keyPressed = new Event();
+    this.keyPressed = {};
 }
 
 Layer.prototype = {
     constructor: Layer,
 
+    addEntity: function (entity) {
+        this.entities.push(entity);
+    },
+
+    forEachEntity: function (f) {
+        var entities = this.entities;
+        var entityCount = entities.length;
+        for (var i = 0; i < entityCount; i++) {
+            f(entities[i]);
+        }
+    },
+
     update: function () {
         var now = Date.now();
         if (this.lastUpdate && this.lastUpdate < now) {
-            var delta = now - this.lastUpdate;
-            // TODO: Update entities
+            var ms = now - this.lastUpdate;
+            this.forEachEntity(function (entity) {
+                var updateEntity = entity.update;
+                if (updateEntity) {
+                    updateEntity(ms);
+                }
+            });
         }
 
         this.lastUpdate = now;
     },
 
-    addEntity: function(entity) {
-        this.entities.push(entity);
-    },
-
     draw: function (canvas, context) {
         context.fillStyle = 'black';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        // TODO: Draw entities
+
+        this.forEachEntity(function (entity) {
+            // TODO: Draw entities based on elements
+            context.fillStyle = 'green';
+            context.fillRect(entity.x - 16, entity.y - 16, 32, 32);
+        });
     }
 };
 
@@ -175,7 +170,12 @@ canvas.width = 640;
 canvas.height = 480;
 document.body.appendChild(canvas);
 
-layers.push(new Layer());
+var entity = new Entity();
+entity.x = 320;
+entity.y = 240;
+var testLayer = new Layer();
+testLayer.addEntity(entity);
+layers.push(testLayer);
 layers.runMainLoop(canvas, canvas.getContext('2d'));
 
 //reset();
