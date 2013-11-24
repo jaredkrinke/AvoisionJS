@@ -1,4 +1,90 @@
-﻿var keyCodeToName = {
+﻿// Vectors and two dimensional transformations
+// TODO: Needed?
+var Transform2D = {
+    createIdentity: function () {
+        return [[1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1]];
+    },
+
+    copy: function (transform) {
+        var result = [[], [], []];
+        for (var i = 0; i < 3; i++) {
+            for (var j = 0; j < 3; j++) {
+                result[i][j] = transform[i][j];
+            }
+        }
+        return result;
+    },
+
+    multiply: function (a, b, result) {
+        for (var i = 0; i < 3; i++) {
+            for (var j = 0; j < 3; j++) {
+                var value = 0;
+                for (var x = 0; x < 3; x++) {
+                    value += a[x][j] * b[i][x];
+                }
+                result[i][j] = value;
+            }
+        }
+        return result;
+    },
+
+    translate: function (transform, x, y, result) {
+        // TODO: It'd be better to not create new matrices each time...
+        var a = this.copy(transform);
+        var b = [[1, 0, x],
+                 [0, 1, y],
+                 [0, 0, 1]];
+        return this.multiply(a, b, transform);
+    },
+
+    scale: function (transform, sx, sy, result) {
+        var a = this.copy(transform);
+        var b = [[sx, 0, 0],
+                 [0, sy, 0],
+                 [0, 0, 1]];
+        return this.multiply(a, b, result);
+    },
+
+    // TODO: These could be optimized and combined so that there aren't so many unnecessary objects getting created
+    transformHomogeneous: function (a, vh) {
+        var avh = [];
+        for (var i = 0; i < 3; i++) {
+            var value = 0;
+            for (var x = 0; x < 3; x++) {
+                value += a[i][x] * vh[x];
+            }
+            avh[i] = value;
+        }
+        return avh;
+    },
+
+    transform: function (a, v) {
+        var avh = this.transformHomogeneous(a, [v[0], v[1], 1]);
+        return [avh[0] / avh[2], avh[1] / avh[2]];
+    }
+
+    // TODO: Is rotate needed?
+    // TODO: Is invert needed?
+
+    // TODO: Needed?
+    //this.identity = this.createIdentity();
+};
+
+Transform2D.prototype = {
+    constructor: Transform2D,
+
+    multiply: function (b) {
+        for (var i = 0; i < 3; i++) {
+            for (var j = 0; j < 3; j++) {
+
+            }
+        }
+    }
+};
+
+var keyCodeToName = {
     //8: 'backspace',
     //9: 'tab',
     //13: 'enter',
@@ -47,15 +133,27 @@ Layer.prototype = {
     },
 
     draw: function (canvas, context) {
+        // TODO: Use clearRect?
         context.fillStyle = 'black';
         context.fillRect(0, 0, canvas.width, canvas.height);
+        var layer = this;
+
+        // Adjust coordinate system
+        // TODO: Should be based on canvas dimensions and support resizing
+        context.save();
+        context.translate(320, 240);
+        context.scale(1, -1);
 
         this.forEachEntity(function (entity) {
             // TODO: Draw entities based on elements
-            // TODO: Add in a transformation for both proper scaling and inverting the y-axis
             context.fillStyle = 'green';
-            context.fillRect(entity.x - 16, canvas.height - (entity.y + 16), 32, 32);
+            // TODO: Transform per entity
+            var width = entity.width;
+            var height = entity.height;
+            context.fillRect(entity.x - width / 2, entity.y - height / 2, width, height);
         });
+
+        context.restore();
     }
 };
 
@@ -65,6 +163,8 @@ function Entity() {
     // TODO: Update function
     this.x = 0;
     this.y = 0;
+    this.width = 1;
+    this.height = 1;
     // TODO: Z order
 }
 
@@ -161,8 +261,8 @@ canvas.height = 480;
 document.body.appendChild(canvas);
 
 var entity = new Entity();
-entity.x = 320;
-entity.y = 240;
+entity.width = 32;
+entity.height = 32;
 entity.update = function (ms) {
     if (entity.movingLeft) {
         entity.x -= 0.1 * ms;
