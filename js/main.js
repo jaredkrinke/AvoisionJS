@@ -1,4 +1,4 @@
-// Vectors and two dimensional transformations
+﻿// Vectors and two dimensional transformations
 // TODO: Needed?
 var Transform2D = {
     createIdentity: function () {
@@ -299,6 +299,8 @@ var layers = new function () {
 
 function Enemy(speedX, speedY) {
     Entity.call(this);
+    this.width = 1 / 30;
+    this.height = 1 / 30;
     this.speed = {
         x: speedX,
         y: speedY
@@ -326,9 +328,6 @@ Enemy.prototype.updateAxis = function (ms, axis, axisSize) {
 
 Enemy.prototype.update = function (ms) {
     this.updateAxis(ms, 'x', this.width);
-};
-
-Enemy.prototype.update = function (ms) {
     this.updateAxis(ms, 'y', this.height);
 };
 
@@ -415,7 +414,7 @@ document.body.appendChild(canvas);
 var testLayer = new Layer();
 var board = new Board();
 board.reset();
-board.addChild(new Enemy(0.1, 0));
+board.addChild(new Enemy(0.6 / 1000, 0));
 testLayer.addEntity(board);
 testLayer.keyPressed = {
     left: function (pressed) {
