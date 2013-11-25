@@ -122,14 +122,33 @@ Layer.prototype = {
         if (this.lastUpdate && this.lastUpdate < now) {
             var ms = now - this.lastUpdate;
             this.forEachEntity(function (entity) {
-                var updateEntity = entity.update;
-                if (updateEntity) {
-                    updateEntity(ms);
+                if (entity.update) {
+                    entity.update(ms);
                 }
             });
         }
 
         this.lastUpdate = now;
+    },
+
+    drawEntity: function (canvas, context, entity) {
+        context.save();
+        context.translate(entity.x, entity.y);
+        context.scale(entity.width, entity.height);
+
+        // TODO: Draw entities based on elements
+        context.fillStyle = entity.color;
+        context.fillRect(-0.5, -0.5, 1, 1);
+
+        // Draw children
+        if (entity.children) {
+            var childCount = entity.children.length;
+            for (var i = 0; i < childCount; i++) {
+                Layer.prototype.drawEntity(canvas, context, entity.children[i]);
+            }
+        }
+
+        context.restore();
     },
 
     draw: function (canvas, context) {
@@ -145,12 +164,7 @@ Layer.prototype = {
         context.scale(1, -1);
 
         this.forEachEntity(function (entity) {
-            // TODO: Draw entities based on elements
-            context.fillStyle = 'green';
-            // TODO: Transform per entity
-            var width = entity.width;
-            var height = entity.height;
-            context.fillRect(entity.x - width / 2, entity.y - height / 2, width, height);
+            Layer.prototype.drawEntity(canvas, context, entity);
         });
 
         context.restore();
@@ -165,12 +179,41 @@ function Entity() {
     this.y = 0;
     this.width = 1;
     this.height = 1;
+    this.color = 'white';
     // TODO: Z order
 }
 
 Entity.prototype = {
-    constructor: Entity
-    // TODO?
+    constructor: Entity,
+
+    addChild: function (child) {
+        if (!this.children) {
+            this.children = [];
+        }
+
+        this.children.push(child);
+    },
+
+    clearChildren: function () {
+        if (this.children) {
+            this.children.length = 0;
+        }
+    },
+
+    updateChildren: function (ms) {
+        if (this.children) {
+            var childCount = this.children.length;
+            for (var i = 0; i < childCount; i++) {
+                this.children[i].update(ms);
+            }
+        }
+    },
+
+    update: function (ms) {
+        this.updateChildren(ms);
+    }
+
+    // TODO: removeChild
 };
 
 // Serializes key presses so that they show up predictably between frames
@@ -254,47 +297,105 @@ var layers = new function () {
     }
 };
 
+function Player() {
+    Entity.call(this);
+    this.color = 'green';
+    this.v = [0, 0, 0, 0];
+    this.speed = 0.6 / 1000;
+    this.width = 1 / 30;
+    this.height= 1 / 30;
+}
+
+Player.prototype = Object.create(Entity.prototype);
+Player.prototype.setMovingUpState = function (pressed) {
+    this.v[0] = pressed ? 1 : 0;
+};
+
+Player.prototype.setMovingDownState = function (pressed) {
+    this.v[1] = pressed ? 1 : 0;
+};
+
+Player.prototype.setMovingLeftState = function (pressed) {
+    this.v[2] = pressed ? 1 : 0;
+};
+
+Player.prototype.setMovingRightState = function (pressed) {
+    this.v[3] = pressed ? 1 : 0;
+};
+
+Player.prototype.clearMovingStates = function () {
+    this.v[0] = 0;
+    this.v[1] = 0;
+    this.v[2] = 0;
+    this.v[3] = 0;
+};
+
+Player.prototype.update = function (ms) {
+    var directionX = this.v[3] - this.v[2];
+    var directionY = this.v[0] - this.v[1];
+    if (directionX || directionY) {
+        var direction = Math.atan2(directionY, directionX);
+        this.x += this.speed * ms * Math.cos(direction);
+        this.y += this.speed * ms * Math.sin(direction);
+
+        // Boundaries
+        if (Math.abs(this.x) + this.width / 2 > 0.5) {
+            if (this.x > 0) {
+                this.x = 0.5 - this.width / 2;
+            } else {
+                this.x = -0.5 + this.width / 2;
+            }
+        }
+
+        if (Math.abs(this.y) + this.height / 2 > 0.5) {
+            if (this.y > 0) {
+                this.y = 0.5 - this.height / 2;
+            } else {
+                this.y = -0.5 + this.height / 2;
+            }
+        }
+    }
+};
+
+function Board() {
+    Entity.call(this);
+    this.width = 400;
+    this.height = 400;
+    this.color = 'blue';
+    this.player = new Player();
+}
+
+Board.prototype = Object.create(Entity.prototype);
+Board.prototype.reset = function () {
+    this.clearChildren();
+    this.addChild(this.player);
+};
+
 // TODO: Better sizing (and support resizing)
 var canvas = document.createElement('canvas');
 canvas.width = 640;
 canvas.height = 480;
 document.body.appendChild(canvas);
 
-var entity = new Entity();
-entity.width = 32;
-entity.height = 32;
-entity.update = function (ms) {
-    if (entity.movingLeft) {
-        entity.x -= 0.1 * ms;
-    }
-    if (entity.movingRight) {
-        entity.x += 0.1 * ms;
-    }
-    if (entity.movingUp) {
-        entity.y += 0.1 * ms;
-    }
-    if (entity.movingDown) {
-        entity.y -= 0.1 * ms;
-    }
-}
-
 var testLayer = new Layer();
-testLayer.addEntity(entity);
+var board = new Board();
+board.reset();
+testLayer.addEntity(board);
 testLayer.keyPressed = {
     left: function (pressed) {
-        entity.movingLeft = pressed;
+        board.player.setMovingLeftState(pressed);
     },
 
     right: function (pressed) {
-        entity.movingRight = pressed;
+        board.player.setMovingRightState(pressed);
     },
 
     up: function (pressed) {
-        entity.movingUp = pressed;
+        board.player.setMovingUpState(pressed);
     },
 
     down: function (pressed) {
-        entity.movingDown = pressed;
+        board.player.setMovingDownState(pressed);
     }
 };
 
