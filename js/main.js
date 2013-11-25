@@ -1,4 +1,4 @@
-﻿// Vectors and two dimensional transformations
+// Vectors and two dimensional transformations
 // TODO: Needed?
 var Transform2D = {
     createIdentity: function () {
@@ -297,6 +297,41 @@ var layers = new function () {
     }
 };
 
+function Enemy(speedX, speedY) {
+    Entity.call(this);
+    this.speed = {
+        x: speedX,
+        y: speedY
+    };
+}
+
+Enemy.prototype = Object.create(Entity.prototype);
+
+Enemy.prototype.updateAxis = function (ms, axis, axisSize) {
+    var axisSpeed = this.speed[axis];
+    var axisPosition = this[axis] + axisSpeed * ms;
+    if (Math.abs(axisPosition) + axisSize / 2 > 0.5) {
+        // Reverse direction
+        if (axisSpeed > 0) {
+            axisPosition = 0.5 - axisSize / 2 - 0.01;
+        } else {
+            axisPosition = -0.5 + axisSize / 2 + 0.01;
+        }
+        
+        this.speed[axis] = -axisSpeed;
+    }
+    
+    this[axis] = axisPosition;
+};
+
+Enemy.prototype.update = function (ms) {
+    this.updateAxis(ms, 'x', this.width);
+};
+
+Enemy.prototype.update = function (ms) {
+    this.updateAxis(ms, 'y', this.height);
+};
+
 function Player() {
     Entity.call(this);
     this.color = 'green';
@@ -380,6 +415,7 @@ document.body.appendChild(canvas);
 var testLayer = new Layer();
 var board = new Board();
 board.reset();
+board.addChild(new Enemy(0.1, 0));
 testLayer.addEntity(board);
 testLayer.keyPressed = {
     left: function (pressed) {
