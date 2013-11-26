@@ -331,6 +331,16 @@ Enemy.prototype.update = function (ms) {
     this.updateAxis(ms, 'y', this.height);
 };
 
+function Goal() {
+    // TODO: Speeds/movement
+    Entity.call(this);
+    this.width = 1 / 30;
+    this.height = 1 / 30;
+    this.color = 'red';
+}
+
+Goal.prototype = Object.create(Entity.prototype);
+
 function Player() {
     Entity.call(this);
     this.color = 'green';
@@ -397,12 +407,82 @@ function Board() {
     this.height = 400;
     this.color = 'blue';
     this.player = new Player();
+    this.goal = new Goal();
 }
 
 Board.prototype = Object.create(Entity.prototype);
+
+Board.prototype.resetGoal = function () {
+    // TODO: Speed/movement
+    // TODO: Scoring
+    var position = this.getSafePosition(this.goal.width, this.goal.height);
+    this.goal.x = position[0];
+    this.goal.y = position[1];
+};
+
+Board.prototype.checkCollision = function (a, b) {
+    var ax1 = a.x - a.width / 2;
+    var ax2 = a.x + a.width / 2;
+    var ay1 = a.y - a.height / 2;
+    var ay2 = a.y + a.height / 2;
+    var bx1 = b.x - b.width / 2;
+    var bx2 = b.x + b.width / 2;
+    var by1 = b.y - b.height / 2;
+    var by2 = b.y + b.height / 2;
+
+    if (((ax1 >= bx1 && ax1 <= bx2) || (ax2 >= bx1 && ax2 <= bx2) || (bx1 >= ax1 && bx1 <= ax2))
+    && ((ay1 >= by1 && ay1 <= by2) || (ay2 >= by1 && ay2 <= by2) || (by1 >= ay1 && by1 <= ay2))) {
+        return true;
+    }
+
+    return false;
+};
+
+Board.prototype.update = function (ms) {
+    // Update children first
+    this.updateChildren(ms);
+
+    // Check for goal intersection
+    if (this.checkCollision(this.player, this.goal)) {
+        // TOOD: Scoring, animation
+        this.resetGoal();
+    }
+
+    // TODO: Timer
+};
+
+Board.prototype.getSafePosition = function (width, height) {
+    var boardPlayerMinimumDistance = 0.15;
+    var ax1 = Math.max(-0.5 + width / 2, this.player.x - (this.player.width / 2 + width / 2 + boardPlayerMinimumDistance));
+    var ax2 = Math.min(0.5 - width / 2, this.player.x + (this.player.width / 2 + width / 2 + boardPlayerMinimumDistance));
+    var ay1 = Math.max(-0.5 + height / 2, this.player.y - (this.player.height / 2 + height / 2 + boardPlayerMinimumDistance));
+    var ay2 = Math.min(0.5 - height / 2, this.player.y + (this.player.height / 2 + height / 2 + boardPlayerMinimumDistance));
+    var valid = true;
+    
+    do {
+        var x = (Math.random() - 0.5) * (1 - width);
+        var y = (Math.random() - 0.5) * (1 - height);
+    
+        var bx1 = x - width / 2;
+        var bx2 = x + width / 2;
+        var by1 = y - height / 2;
+        var by2 = y + height / 2;
+    
+        if (((ax1 >= bx1 && ax1 <= bx2) || (ax2 >= bx1 && ax2 <= bx2) || (bx1 >= ax1 && bx1 <= ax2))
+        && ((ay1 >= by1 && ay1 <= by2) || (ay2 >= by1 && ay2 <= by2) || (by1 >= ay1 && by1 <= ay2))) {
+            valid = false;
+        } else {
+            return [x, y];
+        }
+    } while (!valid)
+};
+
 Board.prototype.reset = function () {
     this.clearChildren();
     this.addChild(this.player);
+    this.addChild(this.goal);
+
+    this.resetGoal();
 };
 
 // TODO: Better sizing (and support resizing)
@@ -414,7 +494,8 @@ document.body.appendChild(canvas);
 var testLayer = new Layer();
 var board = new Board();
 board.reset();
-board.addChild(new Enemy(0.6 / 1000, 0));
+//board.addChild(new Enemy(0.6 / 1000, 0));
+//board.addChild(new Goal());
 testLayer.addEntity(board);
 testLayer.keyPressed = {
     left: function (pressed) {
