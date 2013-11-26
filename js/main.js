@@ -297,10 +297,12 @@ var layers = new function () {
     }
 };
 
-function Enemy(speedX, speedY) {
+function Enemy(x, y, width, height, speedX, speedY) {
     Entity.call(this);
-    this.width = 1 / 30;
-    this.height = 1 / 30;
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
     this.speed = {
         x: speedX,
         y: speedY
@@ -438,6 +440,50 @@ Board.prototype.checkCollision = function (a, b) {
     return false;
 };
 
+Board.prototype.getSafePosition = function (width, height) {
+    var boardPlayerMinimumDistance = 0.15;
+    var ax1 = Math.max(-0.5 + width / 2, this.player.x - (this.player.width / 2 + width / 2 + boardPlayerMinimumDistance));
+    var ax2 = Math.min(0.5 - width / 2, this.player.x + (this.player.width / 2 + width / 2 + boardPlayerMinimumDistance));
+    var ay1 = Math.max(-0.5 + height / 2, this.player.y - (this.player.height / 2 + height / 2 + boardPlayerMinimumDistance));
+    var ay2 = Math.min(0.5 - height / 2, this.player.y + (this.player.height / 2 + height / 2 + boardPlayerMinimumDistance));
+    var valid = true;
+
+    do {
+        var x = (Math.random() - 0.5) * (1 - width);
+        var y = (Math.random() - 0.5) * (1 - height);
+
+        var bx1 = x - width / 2;
+        var bx2 = x + width / 2;
+        var by1 = y - height / 2;
+        var by2 = y + height / 2;
+
+        if (((ax1 >= bx1 && ax1 <= bx2) || (ax2 >= bx1 && ax2 <= bx2) || (bx1 >= ax1 && bx1 <= ax2))
+        && ((ay1 >= by1 && ay1 <= by2) || (ay2 >= by1 && ay2 <= by2) || (by1 >= ay1 && by1 <= ay2))) {
+            valid = false;
+        } else {
+            return [x, y];
+        }
+    } while (!valid)
+};
+
+Board.prototype.addEnemy = function () {
+    var size = 1 / 30;
+    var speed = 0.6 / 1000;
+    var speedX = 0;
+    var speedY = 0;
+    var position = this.getSafePosition(size, size);
+
+    // TODO: Difficulty levels
+
+    if (Math.random() >= 0.5) {
+        speedX = speed;
+    } else {
+        speedY = speed;
+    }
+
+    this.addChild(new Enemy(position[0], position[1], size, size, speedX, speedY));
+};
+
 Board.prototype.update = function (ms) {
     // Update children first
     this.updateChildren(ms);
@@ -446,35 +492,10 @@ Board.prototype.update = function (ms) {
     if (this.checkCollision(this.player, this.goal)) {
         // TOOD: Scoring, animation
         this.resetGoal();
+        this.addEnemy();
     }
 
     // TODO: Timer
-};
-
-Board.prototype.getSafePosition = function (width, height) {
-    var boardPlayerMinimumDistance = 0.15;
-    var ax1 = Math.max(-0.5 + width / 2, this.player.x - (this.player.width / 2 + width / 2 + boardPlayerMinimumDistance));
-    var ax2 = Math.min(0.5 - width / 2, this.player.x + (this.player.width / 2 + width / 2 + boardPlayerMinimumDistance));
-    var ay1 = Math.max(-0.5 + height / 2, this.player.y - (this.player.height / 2 + height / 2 + boardPlayerMinimumDistance));
-    var ay2 = Math.min(0.5 - height / 2, this.player.y + (this.player.height / 2 + height / 2 + boardPlayerMinimumDistance));
-    var valid = true;
-    
-    do {
-        var x = (Math.random() - 0.5) * (1 - width);
-        var y = (Math.random() - 0.5) * (1 - height);
-    
-        var bx1 = x - width / 2;
-        var bx2 = x + width / 2;
-        var by1 = y - height / 2;
-        var by2 = y + height / 2;
-    
-        if (((ax1 >= bx1 && ax1 <= bx2) || (ax2 >= bx1 && ax2 <= bx2) || (bx1 >= ax1 && bx1 <= ax2))
-        && ((ay1 >= by1 && ay1 <= by2) || (ay2 >= by1 && ay2 <= by2) || (by1 >= ay1 && by1 <= ay2))) {
-            valid = false;
-        } else {
-            return [x, y];
-        }
-    } while (!valid)
 };
 
 Board.prototype.reset = function () {
@@ -494,8 +515,6 @@ document.body.appendChild(canvas);
 var testLayer = new Layer();
 var board = new Board();
 board.reset();
-//board.addChild(new Enemy(0.6 / 1000, 0));
-//board.addChild(new Goal());
 testLayer.addEntity(board);
 testLayer.keyPressed = {
     left: function (pressed) {
