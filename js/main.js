@@ -194,6 +194,15 @@ Entity.prototype = {
         this.children.push(child);
     },
 
+    removeChild: function (child) {
+        var childCount = this.children.length;
+        for (var i = 0; i < childCount; i++) {
+            if (child === this.children[i]) {
+                this.children.splice(i, 1);
+            }
+        }
+    },
+
     clearChildren: function () {
         if (this.children) {
             this.children.length = 0;
@@ -212,8 +221,6 @@ Entity.prototype = {
     update: function (ms) {
         this.updateChildren(ms);
     }
-
-    // TODO: removeChild
 };
 
 // Serializes key presses so that they show up predictably between frames
@@ -279,6 +286,7 @@ var layers = new function () {
             });
 
             // Update entities and draw everything
+            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)?
             activeLayer.update();
             activeLayer.draw(canvas, context);
         }
@@ -410,6 +418,8 @@ function Board() {
     this.color = 'blue';
     this.player = new Player();
     this.goal = new Goal();
+    this.paused = false;
+    this.enemies = [];
 }
 
 Board.prototype = Object.create(Entity.prototype);
@@ -481,25 +491,53 @@ Board.prototype.addEnemy = function () {
         speedY = speed;
     }
 
-    this.addChild(new Enemy(position[0], position[1], size, size, speedX, speedY));
+    var enemy = new Enemy(position[0], position[1], size, size, speedX, speedY);
+    this.addChild(enemy);
+    this.enemies.push(enemy);
 };
+
+Board.prototype.lose = function () {
+    this.player.clearMovingStates();
+    // TODO: Animation
+    this.removeChild(this.player);
+    this.paused = true;
+}
 
 Board.prototype.update = function (ms) {
     // Update children first
     this.updateChildren(ms);
 
-    // Check for goal intersection
-    if (this.checkCollision(this.player, this.goal)) {
-        // TOOD: Scoring, animation
-        this.resetGoal();
-        this.addEnemy();
-    }
+    if (!this.paused) {
+        var done = false;
 
-    // TODO: Timer
+        // Check for goal intersection
+        if (this.checkCollision(this.player, this.goal)) {
+            // TOOD: Scoring, animation
+            this.resetGoal();
+            this.addEnemy();
+        }
+
+        // Check for enemy intersection
+        var enemyCount = this.enemies.length;
+        for (var i = 0; i < enemyCount; i++) {
+            if (this.checkCollision(this.player, this.enemies[i])) {
+                done = true;
+                break;
+            }
+        }
+
+        if (done) {
+            this.lose();
+        }
+
+        // TODO: Timer
+    }
 };
 
 Board.prototype.reset = function () {
     this.clearChildren();
+    this.enemies.length = 0;
+
     this.addChild(this.player);
     this.addChild(this.goal);
 
