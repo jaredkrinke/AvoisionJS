@@ -627,34 +627,35 @@ function ScoreDisplay(board, x, y) {
 
 ScoreDisplay.prototype = Object.create(Entity.prototype);
 
-// TODO: Better sizing (and support resizing)
-var canvas = document.createElement('canvas');
-canvas.width = 640;
-canvas.height = 480;
-document.body.appendChild(canvas);
+window.onload = function () {
+    // TODO: Better sizing (and support resizing)
+    var canvas = document.getElementById('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
 
-var testLayer = new Layer();
-var board = new Board();
-testLayer.addEntity(board);
-testLayer.addEntity(new ScoreDisplay(board, -200, 200));
-board.reset();
-testLayer.keyPressed = {
-    left: function (pressed) {
-        board.player.setMovingLeftState(pressed);
-    },
+    var testLayer = new Layer();
+    var board = new Board();
+    testLayer.addEntity(board);
+    testLayer.addEntity(new ScoreDisplay(board, -200, 200));
+    board.reset();
+    testLayer.keyPressed = {
+        left: function (pressed) {
+            board.player.setMovingLeftState(pressed);
+        },
 
-    right: function (pressed) {
-        board.player.setMovingRightState(pressed);
-    },
+        right: function (pressed) {
+            board.player.setMovingRightState(pressed);
+        },
 
-    up: function (pressed) {
-        board.player.setMovingUpState(pressed);
-    },
+        up: function (pressed) {
+            board.player.setMovingUpState(pressed);
+        },
 
-    down: function (pressed) {
-        board.player.setMovingDownState(pressed);
-    }
-};
+        down: function (pressed) {
+            board.player.setMovingDownState(pressed);
+        }
+    };
 
-layers.push(testLayer);
-layers.runMainLoop(canvas, canvas.getContext('2d'));
+    layers.push(testLayer);
+    layers.runMainLoop(canvas, canvas.getContext('2d'));
+}
