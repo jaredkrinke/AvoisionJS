@@ -84,6 +84,26 @@ Transform2D.prototype = {
     }
 };
 
+function Event() {
+    this.callbacks = [];
+}
+
+Event.prototype = {
+    constructor: Event,
+
+    addListener: function (callback) {
+        this.callbacks.push(callback);
+    },
+
+    fire: function () {
+        var callbacks = this.callbacks;
+        var length = callbacks.length;
+        for (var i = 0; i < length; i++) {
+            callbacks[i].apply(null, arguments);
+        }
+    }
+};
+
 var keyCodeToName = {
     //8: 'backspace',
     //9: 'tab',
@@ -136,9 +156,31 @@ Layer.prototype = {
         context.translate(entity.x, entity.y);
         context.scale(entity.width, entity.height);
 
-        // TODO: Draw entities based on elements
+        // Draw all elements (and default to a 1x1 rectangle)
         context.fillStyle = entity.color;
-        context.fillRect(-0.5, -0.5, 1, 1);
+        if (entity.elements) {
+            var elementCount = entity.elements.length;
+            for (var i = 0; i < elementCount; i++) {
+                var element = entity.elements[i];
+                if (element instanceof Rectangle) {
+                    context.fillRect(element.x, -element.y, element.width, element.height);
+                } else if (element instanceof Text && element.text) {
+                    if (element.font) {
+                        context.font = element.font;
+                    }
+
+                    // TODO: Having to flip the coordinate system is kind of obnoxious... should I give in and use inverted coordinates everywhere?
+                    context.textBaseline = element.baseline;
+                    context.textAlign = element.align;
+                    context.save();
+                    context.scale(1, -1);
+                    context.fillText(element.text, element.x, element.y);
+                    context.restore();
+                }
+            }
+        } else {
+            context.fillRect(-0.5, -0.5, 1, 1);
+        }
 
         // Draw children
         if (entity.children) {
@@ -171,6 +213,22 @@ Layer.prototype = {
     }
 };
 
+function Rectangle(x, y, width, height) {
+    this.x = x || -0.5;
+    this.y = y || 0.5;
+    this.width = width || 1;
+    this.height = height || 1;
+}
+
+function Text(text, font, x, y, align, baseline) {
+    this.text = text;
+    this.font = font;
+    this.x = x || 0;
+    this.y = y || 0;
+    this.align = align || 'left';
+    this.baseline = baseline || 'alphabetic';
+}
+
 // Entity that can be displayed and updated each frame
 function Entity() {
     // TODO: Display elements
@@ -186,6 +244,7 @@ function Entity() {
 Entity.prototype = {
     constructor: Entity,
 
+    // TODO: Should subclasses just manipulate the children array directly?
     addChild: function (child) {
         if (!this.children) {
             this.children = [];
@@ -228,14 +287,14 @@ function KeySerializer() {
     var queuedKeyCodes = [];
     var queuedKeyStates = [];
 
-    addEventListener("keydown", function (e) {
+    addEventListener('keydown', function (e) {
         if (e.keyCode in keyCodeToName) {
             queuedKeyCodes.push(e.keyCode);
             queuedKeyStates.push(true);
         }
     }, false);
 
-    addEventListener("keyup", function (e) {
+    addEventListener('keyup', function (e) {
         if (e.keyCode in keyCodeToName) {
             queuedKeyCodes.push(e.keyCode);
             queuedKeyStates.push(false);
@@ -357,7 +416,7 @@ function Player() {
     this.v = [0, 0, 0, 0];
     this.speed = 0.6 / 1000;
     this.width = 1 / 30;
-    this.height= 1 / 30;
+    this.height = 1 / 30;
 }
 
 Player.prototype = Object.create(Entity.prototype);
@@ -420,6 +479,10 @@ function Board() {
     this.goal = new Goal();
     this.paused = false;
     this.enemies = [];
+    this.score = 0;
+    this.scoreUpdated = new Event();
+    // TODO: Varying points
+    this.points = 30;
 }
 
 Board.prototype = Object.create(Entity.prototype);
@@ -512,7 +575,8 @@ Board.prototype.update = function (ms) {
 
         // Check for goal intersection
         if (this.checkCollision(this.player, this.goal)) {
-            // TOOD: Scoring, animation
+            // TOOD: Animation
+            this.setScore(this.score + this.points);
             this.resetGoal();
             this.addEnemy();
         }
@@ -534,6 +598,11 @@ Board.prototype.update = function (ms) {
     }
 };
 
+Board.prototype.setScore = function (score) {
+    this.score = score;
+    this.scoreUpdated.fire(score);
+}
+
 Board.prototype.reset = function () {
     this.clearChildren();
     this.enemies.length = 0;
@@ -541,8 +610,22 @@ Board.prototype.reset = function () {
     this.addChild(this.player);
     this.addChild(this.goal);
 
+    this.setScore(0);
     this.resetGoal();
 };
+
+function ScoreDisplay(board, x, y) {
+    Entity.apply(this);
+    this.x = x;
+    this.y = y;
+    var text = new Text('', '32px sans-serif', 0, 0, null, 'bottom');
+    this.elements = [text];
+    board.scoreUpdated.addListener(function (score) {
+        text.text = 'Score: ' + score;
+    });
+}
+
+ScoreDisplay.prototype = Object.create(Entity.prototype);
 
 // TODO: Better sizing (and support resizing)
 var canvas = document.createElement('canvas');
@@ -552,8 +635,9 @@ document.body.appendChild(canvas);
 
 var testLayer = new Layer();
 var board = new Board();
-board.reset();
 testLayer.addEntity(board);
+testLayer.addEntity(new ScoreDisplay(board, -200, 200));
+board.reset();
 testLayer.keyPressed = {
     left: function (pressed) {
         board.player.setMovingLeftState(pressed);
