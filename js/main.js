@@ -481,18 +481,25 @@ function Board() {
     this.enemies = [];
     this.score = 0;
     this.scoreUpdated = new Event();
+    this.points = 0;
+    this.pointsUpdated = new Event();
     // TODO: Varying points
     this.points = 30;
 }
+
+Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+Board.timeout = 19000;
 
 Board.prototype = Object.create(Entity.prototype);
 
 Board.prototype.resetGoal = function () {
     // TODO: Speed/movement
-    // TODO: Scoring
+    // TODO: Difficulty
     var position = this.getSafePosition(this.goal.width, this.goal.height);
     this.goal.x = position[0];
     this.goal.y = position[1];
+    this.setPoints(Board.pointProgression[0]);
+    this.timer = 0;
 };
 
 Board.prototype.checkCollision = function (a, b) {
@@ -541,7 +548,7 @@ Board.prototype.getSafePosition = function (width, height) {
 
 Board.prototype.addEnemy = function () {
     var size = 1 / 30;
-    var speed = 0.6 / 1000;
+    var speed = 0.2 / 1000;
     var speedX = 0;
     var speedY = 0;
     var position = this.getSafePosition(size, size);
@@ -570,6 +577,9 @@ Board.prototype.update = function (ms) {
     // Update children first
     this.updateChildren(ms);
 
+    // Update timer
+    this.timer += ms;
+
     if (!this.paused) {
         var done = false;
 
@@ -579,6 +589,11 @@ Board.prototype.update = function (ms) {
             this.setScore(this.score + this.points);
             this.resetGoal();
             this.addEnemy();
+        } else {
+            var points = Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
+            if (points != this.points) {
+                this.setPoints(points);
+            }
         }
 
         // Check for enemy intersection
@@ -594,13 +609,18 @@ Board.prototype.update = function (ms) {
             this.lose();
         }
 
-        // TODO: Timer
+        // TODO: Animations
     }
 };
 
 Board.prototype.setScore = function (score) {
     this.score = score;
     this.scoreUpdated.fire(score);
+}
+
+Board.prototype.setPoints = function (points) {
+    this.points = points;
+    this.pointsUpdated.fire(points);
 }
 
 Board.prototype.reset = function () {
@@ -614,18 +634,18 @@ Board.prototype.reset = function () {
     this.resetGoal();
 };
 
-function ScoreDisplay(board, x, y) {
+function ValueDisplay(prefix, event, x, y, align) {
     Entity.apply(this);
     this.x = x;
     this.y = y;
-    var text = new Text('', '32px sans-serif', 0, 0, null, 'bottom');
+    var text = new Text('', '32px sans-serif', 0, 0, align, 'bottom');
     this.elements = [text];
-    board.scoreUpdated.addListener(function (score) {
-        text.text = 'Score: ' + score;
+    event.addListener(function (value) {
+        text.text = prefix + value;
     });
 }
 
-ScoreDisplay.prototype = Object.create(Entity.prototype);
+ValueDisplay.prototype = Object.create(Entity.prototype);
 
 window.onload = function () {
     // TODO: Better sizing (and support resizing)
@@ -636,7 +656,8 @@ window.onload = function () {
     var testLayer = new Layer();
     var board = new Board();
     testLayer.addEntity(board);
-    testLayer.addEntity(new ScoreDisplay(board, -200, 200));
+    testLayer.addEntity(new ValueDisplay('Score: ', board.scoreUpdated, -200, 200, 'left'));
+    testLayer.addEntity(new ValueDisplay('Points: ', board.pointsUpdated, 200, 200, 'right'));
     board.reset();
     testLayer.keyPressed = {
         left: function (pressed) {
