@@ -83,9 +83,10 @@ Layer.prototype = {
                         context.font = element.font;
                     }
 
-                    // TODO: Having to flip the coordinate system is kind of obnoxious... should I give in and use inverted coordinates everywhere?
                     context.textBaseline = element.baseline;
                     context.textAlign = element.align;
+
+                    // Need to flip the coordinate system back so that text is rendered upright
                     context.save();
                     context.scale(1, -1);
                     context.fillText(element.text, element.x, element.y);
@@ -108,16 +109,15 @@ Layer.prototype = {
     },
 
     draw: function (canvas, context) {
-        // TODO: Use clearRect?
         context.fillStyle = 'black';
         context.fillRect(0, 0, canvas.width, canvas.height);
         var layer = this;
 
         // Adjust coordinate system
-        // TODO: Should be based on canvas dimensions and support resizing
         context.save();
-        context.translate(320, 240);
-        context.scale(1, -1);
+        context.translate(canvas.width / 2, canvas.height / 2);
+        var scale = Math.min(canvas.width / 640, canvas.height / 480);
+        context.scale(scale, -scale);
 
         this.forEachEntity(function (entity) {
             Layer.prototype.drawEntity(canvas, context, entity);
@@ -145,14 +145,12 @@ function Text(text, font, x, y, align, baseline) {
 
 // Entity that can be displayed and updated each frame
 function Entity() {
-    // TODO: Display elements
-    // TODO: Update function
     this.x = 0;
     this.y = 0;
     this.width = 1;
     this.height = 1;
     this.color = 'white';
-    // TODO: Z order
+    // TODO: Z order?
 }
 
 Entity.prototype = {
@@ -397,7 +395,6 @@ function Board() {
     this.scoreUpdated = new Event();
     this.points = 0;
     this.pointsUpdated = new Event();
-    // TODO: Varying points
     this.points = 30;
 }
 
@@ -562,10 +559,8 @@ function ValueDisplay(prefix, event, x, y, align) {
 ValueDisplay.prototype = Object.create(Entity.prototype);
 
 window.onload = function () {
-    // TODO: Better sizing (and support resizing)
+    // TODO: Consider automatic resizing (e.g. to fill the screen)
     var canvas = document.getElementById('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
 
     var testLayer = new Layer();
     var board = new Board();
