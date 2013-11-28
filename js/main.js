@@ -53,7 +53,7 @@ Layer.prototype = {
 
     update: function () {
         var now = Date.now();
-        if (this.lastUpdate && this.lastUpdate < now) {
+        if (this.lastUpdate !== undefined && this.lastUpdate < now) {
             var ms = now - this.lastUpdate;
             this.forEachEntity(function (entity) {
                 if (entity.update) {
@@ -70,8 +70,16 @@ Layer.prototype = {
         context.translate(entity.x, entity.y);
         context.scale(entity.width, entity.height);
 
+        if (entity.color) {
+            context.fillStyle = entity.color;
+        }
+
+        // TODO: Check all implicit Boolean conversions to make sure zero (false) is handled correctly!
+        if (entity.opacity !== undefined) {
+            context.globalAlpha *= entity.opacity;
+        }
+
         // Draw all elements (and default to a 1x1 rectangle)
-        context.fillStyle = entity.color;
         if (entity.elements) {
             var elementCount = entity.elements.length;
             for (var i = 0; i < elementCount; i++) {
@@ -184,7 +192,19 @@ Entity.prototype = {
         if (this.children) {
             var childCount = this.children.length;
             for (var i = 0; i < childCount; i++) {
-                this.children[i].update(ms);
+                var child = this.children[i];
+                if (child.update) {
+                    child.update(ms);
+                }
+
+                // Check to see if this child should be removed
+                if (child.dead) {
+                    this.removeChild(child);
+
+                    // Update loop variables to account for the removed child
+                    childCount--;
+                    i--;
+                }
             }
         }
     },
@@ -193,6 +213,118 @@ Entity.prototype = {
         this.updateChildren(ms);
     }
 };
+
+function ScriptedEntity(baseEntity, steps, repeat, endedCallback) {
+    Entity.apply(this);
+    // TODO: Must/should the elements be copied?
+    this.elements = baseEntity.elements;
+    this.color = baseEntity.color;
+    this.steps = steps;
+    this.repeat = repeat;
+    this.endedCallback = endedCallback;
+
+    this.timer = 0;
+    this.stepIndex = 0;
+
+    this.x = steps[0][1];
+    this.y = steps[0][2];
+    this.width = steps[0][3];
+    this.height = steps[0][4];
+    // TODO: Angle?
+    this.opacity = steps[0][5];
+}
+
+ScriptedEntity.prototype = Object.create(Entity.prototype);
+
+ScriptedEntity.prototype.update = function (ms) {
+    var done = false;
+    this.timer += ms;
+    if (this.timer >= this.steps[this.stepIndex][0]) {
+        this.timer = this.timer - this.steps[this.stepIndex][0];
+        this.stepIndex++;
+
+        this.initialX = this.x;
+        this.initialY = this.y;
+        this.initialWidth = this.width;
+        this.initialHeight = this.height;
+        this.initialOpacity = this.opacity;
+
+        if (this.stepIndex >= this.steps.length) {
+            if (this.repeat) {
+                this.stepIndex = 1;
+            } else {
+                this.update = undefined;
+                done = true;
+
+                if (this.endedCallback) {
+                    this.endedCallback();
+                }
+            }
+        }
+    }
+
+    if (!done) {
+        var step = this.steps[this.stepIndex];
+
+        this.x = this.initialX + (step[1] - this.initialX) / step[0] * this.timer;
+        this.y = this.initialY + (step[2] - this.initialY) / step[0] * this.timer;
+        this.width = this.initialWidth + (step[3] - this.initialWidth) / step[0] * this.timer;
+        this.height = this.initialHeight + (step[4] - this.initialHeight) / step[0] * this.timer;
+        this.opacity = this.initialOpacity + (step[5] - this.initialOpacity) / step[0] * this.timer;
+    } else {
+        var step = this.steps[this.steps.length - 1];
+
+        this.x = step[1];
+        this.y = step[2];
+        this.width = step[3];
+        this.height = step[4];
+        this.opacity = step[5];
+    }
+};
+
+function Ghost(entity, period, scaleMax, inward, endedCallback, offsetX2, offsetY2) {
+    var initialScale = 1;
+    var finalScale = 1;
+    var opacity = (entity.opacity >= 0 ? entity.opacity : 1);
+    var finalOpacity;
+    var x2 = entity.x;
+    var y2 = entity.y;
+
+    if (inward) {
+        initialScale = scaleMax;
+        finalOpacity = opacity;
+        opacity = 0;
+    } else {
+        // Default case is outward
+        finalScale = scaleMax;
+        finalOpacity = 0;
+    }
+
+    if (offsetX2 !== undefined) {
+        x2 += offsetX2;
+    }
+
+    if (offsetY2 !== undefined) {
+        y2 += offsetY2;
+    }
+
+    ScriptedEntity.call(
+        this,
+        entity,
+        [[0, entity.x, entity.y, entity.width * initialScale, entity.height * initialScale, opacity],
+         [period, x2, y2, entity.width * finalScale, entity.height * finalScale, finalOpacity]],
+        false,
+        function () {
+            this.dead = true;
+            if (this.ghostEnded) {
+                this.ghostEnded();
+            }
+        });
+
+    this.ghostEnded = endedCallback;
+}
+
+Ghost.prototype = Object.create(ScriptedEntity.prototype);
 
 // Serializes key presses so that they show up predictably between frames
 function KeySerializer() {
@@ -322,6 +454,10 @@ function Goal() {
 
 Goal.prototype = Object.create(Entity.prototype);
 
+Goal.prototype.createGhost = function () {
+    return new Ghost(this, 500, 5);
+};
+
 function Player() {
     Entity.call(this);
     this.color = 'green';
@@ -353,6 +489,10 @@ Player.prototype.clearMovingStates = function () {
     this.v[1] = 0;
     this.v[2] = 0;
     this.v[3] = 0;
+};
+
+Player.prototype.createGhost = function () {
+    return new Ghost(this, 750, 6);
 };
 
 Player.prototype.update = function (ms) {
@@ -472,17 +612,28 @@ Board.prototype.addEnemy = function () {
         speedY = speed;
     }
 
+    // Animate in the new enemy
     var enemy = new Enemy(position[0], position[1], size, size, speedX, speedY);
-    this.addChild(enemy);
-    this.enemies.push(enemy);
+    var board = this;
+    this.addChild(new Ghost(enemy, 500, 0, true, function () {
+        board.addChild(enemy);
+        board.enemies.push(enemy);
+    }));
 };
 
 Board.prototype.lose = function () {
     this.player.clearMovingStates();
-    // TODO: Animation
+    this.addChild(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
 }
+
+Board.prototype.captureGoal = function () {
+    this.setScore(this.score + this.points);
+    this.addChild(this.goal.createGhost());
+    this.resetGoal();
+    this.addEnemy();
+};
 
 Board.prototype.update = function (ms) {
     // Update children first
@@ -496,13 +647,10 @@ Board.prototype.update = function (ms) {
 
         // Check for goal intersection
         if (this.checkCollision(this.player, this.goal)) {
-            // TOOD: Animation
-            this.setScore(this.score + this.points);
-            this.resetGoal();
-            this.addEnemy();
+            this.captureGoal();
         } else {
             var points = Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
-            if (points != this.points) {
+            if (points !== this.points) {
                 this.setPoints(points);
             }
         }
