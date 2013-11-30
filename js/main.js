@@ -79,7 +79,7 @@ Layer.prototype = {
             context.globalAlpha *= entity.opacity;
         }
 
-        // Draw all elements (and default to a 1x1 rectangle)
+        // Draw all elements
         if (entity.elements) {
             var elementCount = entity.elements.length;
             for (var i = 0; i < elementCount; i++) {
@@ -101,8 +101,6 @@ Layer.prototype = {
                     context.restore();
                 }
             }
-        } else {
-            context.fillRect(-0.5, -0.5, 1, 1);
         }
 
         // Draw children
@@ -418,6 +416,7 @@ function Enemy(x, y, width, height, speedX, speedY) {
         x: speedX,
         y: speedY
     };
+    this.elements = [new Rectangle()];
 }
 
 Enemy.prototype = Object.create(Entity.prototype);
@@ -450,6 +449,7 @@ function Goal() {
     this.width = 1 / 30;
     this.height = 1 / 30;
     this.color = 'red';
+    this.elements = [new Rectangle()];
 }
 
 Goal.prototype = Object.create(Entity.prototype);
@@ -465,6 +465,7 @@ function Player() {
     this.speed = 0.6 / 1000;
     this.width = 1 / 30;
     this.height = 1 / 30;
+    this.elements = [new Rectangle()];
 }
 
 Player.prototype = Object.create(Entity.prototype);
@@ -536,6 +537,7 @@ function Board() {
     this.points = 0;
     this.pointsUpdated = new Event();
     this.points = 30;
+    this.elements = [new Rectangle()];
 }
 
 Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
@@ -693,11 +695,11 @@ Board.prototype.reset = function () {
     this.resetGoal();
 };
 
-function ValueDisplay(prefix, event, x, y, align) {
+function ValueDisplay(font, prefix, event, x, y, align) {
     Entity.apply(this);
     this.x = x;
     this.y = y;
-    var text = new Text('', '32px sans-serif', 0, 0, align, 'bottom');
+    var text = new Text('', font, 0, 0, align, 'bottom');
     this.elements = [text];
     event.addListener(function (value) {
         text.text = prefix + value;
@@ -706,6 +708,17 @@ function ValueDisplay(prefix, event, x, y, align) {
 
 ValueDisplay.prototype = Object.create(Entity.prototype);
 
+function Display(board) {
+    Entity.apply(this);
+    var font = '32px sans-serif';
+    this.addChild(new ValueDisplay(font, 'Score: ', board.scoreUpdated, -200, 200, 'left'));
+    this.addChild(new ValueDisplay(font, 'Points: ', board.pointsUpdated, 200, 200, 'right'));
+    // TODO: Effects
+    // TODO: How to use measureText during updates? Or just do it somewhere else?
+}
+
+Display.prototype = Object.create(Entity.prototype);
+
 window.onload = function () {
     // TODO: Consider automatic resizing (e.g. to fill the screen)
     var canvas = document.getElementById('canvas');
@@ -713,8 +726,7 @@ window.onload = function () {
     var testLayer = new Layer();
     var board = new Board();
     testLayer.addEntity(board);
-    testLayer.addEntity(new ValueDisplay('Score: ', board.scoreUpdated, -200, 200, 'left'));
-    testLayer.addEntity(new ValueDisplay('Points: ', board.pointsUpdated, 200, 200, 'right'));
+    testLayer.addEntity(new Display(board));
     board.reset();
     testLayer.keyPressed = {
         left: function (pressed) {
