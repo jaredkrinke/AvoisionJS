@@ -41,6 +41,7 @@ Layer.prototype = {
 
     addEntity: function (entity) {
         this.entities.push(entity);
+        return entity;
     },
 
     forEachEntity: function (f) {
@@ -747,25 +748,23 @@ function Display(board) {
     }
 
     var scoreLabel = new Text('Score: ', font, -200, 200, 'left', 'bottom');
-    var padding = (new Text('MM', font)).getTotalWidth();
+    var padding = (new Text('00', font)).getTotalWidth();
     var pointLabel = new Text('Points: ', font, 200 - padding, 200, 'right', 'bottom');
     this.elements = [scoreLabel, pointLabel];
+    // TODO: Don't add the effect when the game first starts
     this.addChild(new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
     this.addChild(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
 }
 
 Display.prototype = Object.create(Entity.prototype);
 
-window.onload = function () {
-    // TODO: Consider automatic resizing (e.g. to fill the screen)
-    Radius.initialize(document.getElementById('canvas'));
-
-    var testLayer = new Layer();
-    var board = new Board();
-    testLayer.addEntity(board);
-    testLayer.addEntity(new Display(board));
-    board.reset();
-    testLayer.keyPressed = {
+function GameLayer() {
+    Layer.apply(this);
+    this.board = this.addEntity(new Board());
+    this.display = this.addEntity(new Display(this.board));
+    this.board.reset();
+    var board = this.board;
+    this.keyPressed = {
         left: function (pressed) {
             board.player.setMovingLeftState(pressed);
         },
@@ -782,6 +781,12 @@ window.onload = function () {
             board.player.setMovingDownState(pressed);
         }
     };
+}
 
-    Radius.start(testLayer);
+GameLayer.prototype = Object.create(Layer.prototype);
+
+window.onload = function () {
+    // TODO: Consider automatic resizing (e.g. to fill the screen)
+    Radius.initialize(document.getElementById('canvas'));
+    Radius.start(new GameLayer());
 }
