@@ -85,6 +85,19 @@ Layer.prototype = {
             var elementCount = entity.elements.length;
             for (var i = 0; i < elementCount; i++) {
                 var element = entity.elements[i];
+                context.save();
+
+                // Need to flip the coordinate system back so that text is rendered upright
+                context.scale(1, -1);
+
+                if (element.color) {
+                    context.fillStyle = element.color;
+                }
+
+                if (element.opacity !== undefined) {
+                    context.globalAlpha *= element.opacity;
+                }
+
                 if (element instanceof Rectangle) {
                     context.fillRect(element.x, -element.y, element.width, element.height);
                 } else if (element instanceof Text && element.text) {
@@ -94,13 +107,10 @@ Layer.prototype = {
 
                     context.textBaseline = element.baseline;
                     context.textAlign = element.align;
-
-                    // Need to flip the coordinate system back so that text is rendered upright
-                    context.save();
-                    context.scale(1, -1);
                     context.fillText(element.text, element.x, -element.y);
-                    context.restore();
                 }
+
+                context.restore();
             }
         }
 
@@ -118,7 +128,6 @@ Layer.prototype = {
     draw: function (canvas, context) {
         context.fillStyle = 'black';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        var layer = this;
 
         // Adjust coordinate system
         context.save();
@@ -135,8 +144,8 @@ Layer.prototype = {
 };
 
 function Rectangle(x, y, width, height) {
-    this.x = x || -0.5;
-    this.y = y || 0.5;
+    this.x = (x !== undefined ? x : -0.5);
+    this.y = (y !== undefined ? y : 0.5);
     this.width = width || 1;
     this.height = height || 1;
 }
@@ -178,6 +187,7 @@ Entity.prototype = {
         }
 
         this.children.push(child);
+        return child;
     },
 
     removeChild: function (child) {
@@ -221,11 +231,16 @@ Entity.prototype = {
     }
 };
 
-function ScriptedEntity(baseEntity, steps, repeat, endedCallback) {
+function ScriptedEntity(entityOrElements, steps, repeat, endedCallback) {
     Entity.apply(this);
     // TODO: Must/should the elements be copied?
-    this.elements = baseEntity.elements;
-    this.color = baseEntity.color;
+    if (entityOrElements instanceof Entity) {
+        this.elements = entityOrElements.elements;
+        this.color = entityOrElements.color;
+    } else {
+        this.elements = entityOrElements;
+    }
+
     this.steps = steps;
     this.repeat = repeat;
     this.endedCallback = endedCallback;
@@ -560,6 +575,7 @@ function Board() {
     this.points = 0;
     this.pointsUpdated = new Event();
     this.points = 30;
+    this.lost = new Event();
     this.elements = [new Rectangle()];
 }
 
@@ -651,6 +667,7 @@ Board.prototype.lose = function () {
     this.addChild(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
+    this.lost.fire();
 }
 
 Board.prototype.captureGoal = function () {
@@ -741,10 +758,11 @@ ValueDisplay.prototype = Object.create(Entity.prototype);
 function Display(board) {
     Entity.apply(this);
     var font = '32px sans-serif';
+    var textHeight = 32;
     var display = this;
     var addUpdateEffect = function () {
         var sign = (this.align === 'right') ? 1 : -1;
-        display.addChild(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -16));
+        display.addChild(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
     }
 
     var scoreLabel = new Text('Score: ', font, -200, 200, 'left', 'bottom');
@@ -752,17 +770,40 @@ function Display(board) {
     var pointLabel = new Text('Points: ', font, 200 - padding, 200, 'right', 'bottom');
     this.elements = [scoreLabel, pointLabel];
     // TODO: Don't add the effect when the game first starts
-    this.addChild(new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
+    this.scoreDisplay = this.addChild(new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
     this.addChild(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
+
+    this.font = font;
+    this.textHeight = textHeight;
+    this.scoreLabel = scoreLabel;
 }
 
 Display.prototype = Object.create(Entity.prototype);
+
+Display.prototype.emphasizeScore = function () {
+    var content = this.scoreLabel.text + this.scoreDisplay.textElement.text;
+    var textElement = new Text(content, this.font, 0, 0, 'left', 'middle');
+    var textWidth = textElement.getTotalWidth();
+    var background = new Rectangle(-this.textHeight / 2, this.textHeight / 2, textWidth + this.textHeight, this.textHeight);
+    background.color = 'blue';
+    background.opacity = 0.85;
+    var scaleMax = 2;
+    this.bigScore = this.addChild(new ScriptedEntity([background, textElement],
+        [[0, -200 + this.textHeight / 2, 200, 1, 1, 1],
+         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 1]]));
+};
 
 function GameLayer() {
     Layer.apply(this);
     this.board = this.addEntity(new Board());
     this.display = this.addEntity(new Display(this.board));
     this.board.reset();
+
+    var display = this.display;
+    this.board.lost.addListener(function () {
+        display.emphasizeScore();
+    });
+
     var board = this.board;
     this.keyPressed = {
         left: function (pressed) {
