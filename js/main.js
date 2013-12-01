@@ -41,6 +41,7 @@ Layer.prototype = {
 
     addEntity: function (entity) {
         this.entities.push(entity);
+        return entity;
     },
 
     forEachEntity: function (f) {
@@ -79,11 +80,24 @@ Layer.prototype = {
             context.globalAlpha *= entity.opacity;
         }
 
-        // Draw all elements (and default to a 1x1 rectangle)
+        // Draw all elements
         if (entity.elements) {
             var elementCount = entity.elements.length;
             for (var i = 0; i < elementCount; i++) {
                 var element = entity.elements[i];
+                context.save();
+
+                // Need to flip the coordinate system back so that text is rendered upright
+                context.scale(1, -1);
+
+                if (element.color) {
+                    context.fillStyle = element.color;
+                }
+
+                if (element.opacity !== undefined) {
+                    context.globalAlpha *= element.opacity;
+                }
+
                 if (element instanceof Rectangle) {
                     context.fillRect(element.x, -element.y, element.width, element.height);
                 } else if (element instanceof Text && element.text) {
@@ -93,16 +107,11 @@ Layer.prototype = {
 
                     context.textBaseline = element.baseline;
                     context.textAlign = element.align;
-
-                    // Need to flip the coordinate system back so that text is rendered upright
-                    context.save();
-                    context.scale(1, -1);
-                    context.fillText(element.text, element.x, element.y);
-                    context.restore();
+                    context.fillText(element.text, element.x, -element.y);
                 }
+
+                context.restore();
             }
-        } else {
-            context.fillRect(-0.5, -0.5, 1, 1);
         }
 
         // Draw children
@@ -119,12 +128,11 @@ Layer.prototype = {
     draw: function (canvas, context) {
         context.fillStyle = 'black';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        var layer = this;
 
         // Adjust coordinate system
         context.save();
         context.translate(canvas.width / 2, canvas.height / 2);
-        var scale = Math.min(canvas.width / 640, canvas.height / 480);
+        var scale = Radius.getScale();
         context.scale(scale, -scale);
 
         this.forEachEntity(function (entity) {
@@ -136,8 +144,8 @@ Layer.prototype = {
 };
 
 function Rectangle(x, y, width, height) {
-    this.x = x || -0.5;
-    this.y = y || 0.5;
+    this.x = (x !== undefined ? x : -0.5);
+    this.y = (y !== undefined ? y : 0.5);
     this.width = width || 1;
     this.height = height || 1;
 }
@@ -149,6 +157,14 @@ function Text(text, font, x, y, align, baseline) {
     this.y = y || 0;
     this.align = align || 'left';
     this.baseline = baseline || 'alphabetic';
+}
+
+Text.prototype = {
+    constructor: Text,
+
+    getTotalWidth: function () {
+        return Radius.getTextWidth(this.font, this.text);
+    }
 }
 
 // Entity that can be displayed and updated each frame
@@ -171,6 +187,7 @@ Entity.prototype = {
         }
 
         this.children.push(child);
+        return child;
     },
 
     removeChild: function (child) {
@@ -214,11 +231,16 @@ Entity.prototype = {
     }
 };
 
-function ScriptedEntity(baseEntity, steps, repeat, endedCallback) {
+function ScriptedEntity(entityOrElements, steps, repeat, endedCallback) {
     Entity.apply(this);
     // TODO: Must/should the elements be copied?
-    this.elements = baseEntity.elements;
-    this.color = baseEntity.color;
+    if (entityOrElements instanceof Entity) {
+        this.elements = entityOrElements.elements;
+        this.color = entityOrElements.color;
+    } else {
+        this.elements = entityOrElements;
+    }
+
     this.steps = steps;
     this.repeat = repeat;
     this.endedCallback = endedCallback;
@@ -358,19 +380,18 @@ function KeySerializer() {
     };
 }
 
-// Layers handles a stack of layers (only the top one is visible/running)
-var layers = new function () {
+var Radius = new function () {
     var keySerializer = new KeySerializer();
     var list = [];
     var canvas;
     var context;
 
     // TODO: Shown handlers, etc.
-    this.push = function (layer) {
+    this.pushLayer = function (layer) {
         list.unshift(layer);
     };
 
-    this.pop = function () {
+    this.popLayer = function () {
         list.shift();
     };
 
@@ -389,7 +410,7 @@ var layers = new function () {
             });
 
             // Update entities and draw everything
-            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)?
+            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)? Auto-pause?
             activeLayer.update();
             activeLayer.draw(canvas, context);
         }
@@ -398,13 +419,28 @@ var layers = new function () {
         requestAnimationFrame(loop);
     };
 
-    this.runMainLoop = function (newCanvas, newContext) {
-        // Initialization
-        canvas = newCanvas;
-        context = newContext;
+    this.initialize = function (targetCanvas) {
+        canvas = targetCanvas;
+        context = canvas.getContext('2d');
+    }
 
-        // Start looping
+    this.start = function (layer) {
+        this.pushLayer(layer);
         loop();
+    }
+
+    // TODO: Needed? (Probably yes for mouse clicks, etc.)
+    this.getScale = function () {
+        return Math.min(canvas.width / 640, canvas.height / 480);
+    }
+
+    this.getTextWidth = function (font, text) {
+        context.save();
+        context.font = font;
+        var width = context.measureText(text).width;
+        context.restore();
+
+        return width;
     }
 };
 
@@ -418,6 +454,7 @@ function Enemy(x, y, width, height, speedX, speedY) {
         x: speedX,
         y: speedY
     };
+    this.elements = [new Rectangle()];
 }
 
 Enemy.prototype = Object.create(Entity.prototype);
@@ -450,6 +487,7 @@ function Goal() {
     this.width = 1 / 30;
     this.height = 1 / 30;
     this.color = 'red';
+    this.elements = [new Rectangle()];
 }
 
 Goal.prototype = Object.create(Entity.prototype);
@@ -465,6 +503,7 @@ function Player() {
     this.speed = 0.6 / 1000;
     this.width = 1 / 30;
     this.height = 1 / 30;
+    this.elements = [new Rectangle()];
 }
 
 Player.prototype = Object.create(Entity.prototype);
@@ -536,6 +575,8 @@ function Board() {
     this.points = 0;
     this.pointsUpdated = new Event();
     this.points = 30;
+    this.lost = new Event();
+    this.elements = [new Rectangle()];
 }
 
 Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
@@ -626,6 +667,7 @@ Board.prototype.lose = function () {
     this.addChild(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
+    this.lost.fire();
 }
 
 Board.prototype.captureGoal = function () {
@@ -693,30 +735,77 @@ Board.prototype.reset = function () {
     this.resetGoal();
 };
 
-function ValueDisplay(prefix, event, x, y, align) {
+function ValueDisplay(font, event, x, y, align, updatedCallback) {
     Entity.apply(this);
     this.x = x;
     this.y = y;
-    var text = new Text('', '32px sans-serif', 0, 0, align, 'bottom');
-    this.elements = [text];
+    this.align = align;
+    this.textElement = new Text('', font, 0, 0, align, 'bottom');
+    this.elements = [this.textElement];
+    this.updatedCallback = updatedCallback;
+    var valueDisplay = this;
     event.addListener(function (value) {
-        text.text = prefix + value;
+        valueDisplay.textElement.text = '' + value;
+
+        if (valueDisplay.updatedCallback) {
+            valueDisplay.updatedCallback();
+        }
     });
 }
 
 ValueDisplay.prototype = Object.create(Entity.prototype);
 
-window.onload = function () {
-    // TODO: Consider automatic resizing (e.g. to fill the screen)
-    var canvas = document.getElementById('canvas');
+function Display(board) {
+    Entity.apply(this);
+    var font = '32px sans-serif';
+    var textHeight = 32;
+    var display = this;
+    var addUpdateEffect = function () {
+        var sign = (this.align === 'right') ? 1 : -1;
+        display.addChild(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
+    }
 
-    var testLayer = new Layer();
-    var board = new Board();
-    testLayer.addEntity(board);
-    testLayer.addEntity(new ValueDisplay('Score: ', board.scoreUpdated, -200, 200, 'left'));
-    testLayer.addEntity(new ValueDisplay('Points: ', board.pointsUpdated, 200, 200, 'right'));
-    board.reset();
-    testLayer.keyPressed = {
+    var scoreLabel = new Text('Score: ', font, -200, 200, 'left', 'bottom');
+    var padding = (new Text('00', font)).getTotalWidth();
+    var pointLabel = new Text('Points: ', font, 200 - padding, 200, 'right', 'bottom');
+    this.elements = [scoreLabel, pointLabel];
+    // TODO: Don't add the effect when the game first starts
+    this.scoreDisplay = this.addChild(new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
+    this.addChild(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
+
+    this.font = font;
+    this.textHeight = textHeight;
+    this.scoreLabel = scoreLabel;
+}
+
+Display.prototype = Object.create(Entity.prototype);
+
+Display.prototype.emphasizeScore = function () {
+    var content = this.scoreLabel.text + this.scoreDisplay.textElement.text;
+    var textElement = new Text(content, this.font, 0, 0, 'left', 'middle');
+    var textWidth = textElement.getTotalWidth();
+    var background = new Rectangle(-this.textHeight / 2, this.textHeight / 2, textWidth + this.textHeight, this.textHeight);
+    background.color = 'blue';
+    background.opacity = 0.85;
+    var scaleMax = 2;
+    this.bigScore = this.addChild(new ScriptedEntity([background, textElement],
+        [[0, -200 + this.textHeight / 2, 200, 1, 1, 1],
+         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 1]]));
+};
+
+function GameLayer() {
+    Layer.apply(this);
+    this.board = this.addEntity(new Board());
+    this.display = this.addEntity(new Display(this.board));
+    this.board.reset();
+
+    var display = this.display;
+    this.board.lost.addListener(function () {
+        display.emphasizeScore();
+    });
+
+    var board = this.board;
+    this.keyPressed = {
         left: function (pressed) {
             board.player.setMovingLeftState(pressed);
         },
@@ -733,7 +822,12 @@ window.onload = function () {
             board.player.setMovingDownState(pressed);
         }
     };
+}
 
-    layers.push(testLayer);
-    layers.runMainLoop(canvas, canvas.getContext('2d'));
+GameLayer.prototype = Object.create(Layer.prototype);
+
+window.onload = function () {
+    // TODO: Consider automatic resizing (e.g. to fill the screen)
+    Radius.initialize(document.getElementById('canvas'));
+    Radius.start(new GameLayer());
 }
