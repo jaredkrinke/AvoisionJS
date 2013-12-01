@@ -97,7 +97,7 @@ Layer.prototype = {
                     // Need to flip the coordinate system back so that text is rendered upright
                     context.save();
                     context.scale(1, -1);
-                    context.fillText(element.text, element.x, element.y);
+                    context.fillText(element.text, element.x, -element.y);
                     context.restore();
                 }
             }
@@ -122,7 +122,7 @@ Layer.prototype = {
         // Adjust coordinate system
         context.save();
         context.translate(canvas.width / 2, canvas.height / 2);
-        var scale = Math.min(canvas.width / 640, canvas.height / 480);
+        var scale = Radius.getScale();
         context.scale(scale, -scale);
 
         this.forEachEntity(function (entity) {
@@ -147,6 +147,14 @@ function Text(text, font, x, y, align, baseline) {
     this.y = y || 0;
     this.align = align || 'left';
     this.baseline = baseline || 'alphabetic';
+}
+
+Text.prototype = {
+    constructor: Text,
+
+    getTotalWidth: function () {
+        return Radius.getTextWidth(this.font, this.text);
+    }
 }
 
 // Entity that can be displayed and updated each frame
@@ -356,19 +364,18 @@ function KeySerializer() {
     };
 }
 
-// Layers handles a stack of layers (only the top one is visible/running)
-var layers = new function () {
+var Radius = new function () {
     var keySerializer = new KeySerializer();
     var list = [];
     var canvas;
     var context;
 
     // TODO: Shown handlers, etc.
-    this.push = function (layer) {
+    this.pushLayer = function (layer) {
         list.unshift(layer);
     };
 
-    this.pop = function () {
+    this.popLayer = function () {
         list.shift();
     };
 
@@ -387,7 +394,7 @@ var layers = new function () {
             });
 
             // Update entities and draw everything
-            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)?
+            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)? Auto-pause?
             activeLayer.update();
             activeLayer.draw(canvas, context);
         }
@@ -396,13 +403,28 @@ var layers = new function () {
         requestAnimationFrame(loop);
     };
 
-    this.runMainLoop = function (newCanvas, newContext) {
-        // Initialization
-        canvas = newCanvas;
-        context = newContext;
+    this.initialize = function (targetCanvas) {
+        canvas = targetCanvas;
+        context = canvas.getContext('2d');
+    }
 
-        // Start looping
+    this.start = function (layer) {
+        this.pushLayer(layer);
         loop();
+    }
+
+    // TODO: Needed? (Probably yes for mouse clicks, etc.)
+    this.getScale = function () {
+        return Math.min(canvas.width / 640, canvas.height / 480);
+    }
+
+    this.getTextWidth = function (font, text) {
+        context.save();
+        context.font = font;
+        var width = context.measureText(text).width;
+        context.restore();
+
+        return width;
     }
 };
 
@@ -695,14 +717,21 @@ Board.prototype.reset = function () {
     this.resetGoal();
 };
 
-function ValueDisplay(font, prefix, event, x, y, align) {
+function ValueDisplay(font, event, x, y, align, updatedCallback) {
     Entity.apply(this);
     this.x = x;
     this.y = y;
-    var text = new Text('', font, 0, 0, align, 'bottom');
-    this.elements = [text];
+    this.align = align;
+    this.textElement = new Text('', font, 0, 0, align, 'bottom');
+    this.elements = [this.textElement];
+    this.updatedCallback = updatedCallback;
+    var valueDisplay = this;
     event.addListener(function (value) {
-        text.text = prefix + value;
+        valueDisplay.textElement.text = '' + value;
+
+        if (valueDisplay.updatedCallback) {
+            valueDisplay.updatedCallback();
+        }
     });
 }
 
@@ -711,17 +740,25 @@ ValueDisplay.prototype = Object.create(Entity.prototype);
 function Display(board) {
     Entity.apply(this);
     var font = '32px sans-serif';
-    this.addChild(new ValueDisplay(font, 'Score: ', board.scoreUpdated, -200, 200, 'left'));
-    this.addChild(new ValueDisplay(font, 'Points: ', board.pointsUpdated, 200, 200, 'right'));
-    // TODO: Effects
-    // TODO: How to use measureText during updates? Or just do it somewhere else?
+    var display = this;
+    var addUpdateEffect = function () {
+        var sign = (this.align === 'right') ? 1 : -1;
+        display.addChild(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -16));
+    }
+
+    var scoreLabel = new Text('Score: ', font, -200, 200, 'left', 'bottom');
+    var padding = (new Text('MM', font)).getTotalWidth();
+    var pointLabel = new Text('Points: ', font, 200 - padding, 200, 'right', 'bottom');
+    this.elements = [scoreLabel, pointLabel];
+    this.addChild(new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
+    this.addChild(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
 }
 
 Display.prototype = Object.create(Entity.prototype);
 
 window.onload = function () {
     // TODO: Consider automatic resizing (e.g. to fill the screen)
-    var canvas = document.getElementById('canvas');
+    Radius.initialize(document.getElementById('canvas'));
 
     var testLayer = new Layer();
     var board = new Board();
@@ -746,6 +783,5 @@ window.onload = function () {
         }
     };
 
-    layers.push(testLayer);
-    layers.runMainLoop(canvas, canvas.getContext('2d'));
+    Radius.start(testLayer);
 }
