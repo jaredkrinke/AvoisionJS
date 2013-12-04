@@ -18,6 +18,79 @@ Event.prototype = {
     }
 };
 
+// TODO: This could surely be optimized
+var Transform2D = {
+    createIdentity: function () {
+        return [[1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1]];
+    },
+
+    copy: function (transform) {
+        var result = [[], [], []];
+        for (var i = 0; i < 3; i++) {
+            for (var j = 0; j < 3; j++) {
+                result[i][j] = transform[i][j];
+            }
+        }
+        return result;
+    },
+
+    multiply: function (a, b, result) {
+        for (var i = 0; i < 3; i++) {
+            for (var j = 0; j < 3; j++) {
+                var value = 0;
+                for (var x = 0; x < 3; x++) {
+                    value += a[x][j] * b[i][x];
+                }
+                result[i][j] = value;
+            }
+        }
+        return result;
+    },
+
+    translate: function (transform, x, y, result) {
+        // TODO: It'd be better to not create new matrices each time...
+        var a = this.copy(transform);
+        var b = [[1, 0, x],
+                 [0, 1, y],
+                 [0, 0, 1]];
+        return this.multiply(a, b, transform);
+    },
+
+    scale: function (transform, sx, sy, result) {
+        var a = this.copy(transform);
+        var b = [[sx, 0, 0],
+                 [0, sy, 0],
+                 [0, 0, 1]];
+        return this.multiply(a, b, result);
+    },
+
+    // TODO: These could be optimized and combined so that there aren't so many unnecessary objects getting created
+    transformHomogeneous: function (a, vh) {
+        var avh = [];
+        for (var i = 0; i < 3; i++) {
+            var value = 0;
+            for (var x = 0; x < 3; x++) {
+                value += a[i][x] * vh[x];
+            }
+            avh[i] = value;
+        }
+        return avh;
+    },
+
+    transform: function (a, v) {
+        var avh = this.transformHomogeneous(a, [v[0], v[1], 1]);
+        return [avh[0] / avh[2], avh[1] / avh[2]];
+    }
+
+    // TODO: Is rotate needed?
+    // TODO: Is invert needed?
+
+    // TODO: Needed?
+    //this.identity = this.createIdentity();
+};
+
 var keyCodeToName = {
     //8: 'backspace',
     //9: 'tab',
@@ -380,8 +453,65 @@ function KeySerializer() {
     };
 }
 
+// Serializes mouse events so that they are only handled between frames
+var MouseEvent = {
+    down: 1,
+    up: 2,
+    move: 3
+};
+
+var MouseButton = {
+    primary: 0,
+    secondary: 2,
+    tertiary: 1
+};
+
+function MouseSerializer(canvas) {
+    var queuedMouseEvents = [];
+    var queuedMousePayloads = [];
+
+    canvas.addEventListener('mousedown', function (e) {
+        queuedMouseEvents.push(MouseEvent.down);
+        queuedMousePayloads.push([e.clientX, e.clientY, e.button]);
+    });
+
+    canvas.addEventListener('mouseup', function (e) {
+        queuedMouseEvents.push(MouseEvent.up);
+        queuedMousePayloads.push([e.clientX, e.clientY, e.button]);
+    });
+
+    canvas.addEventListener('mousemove', function (e) {
+        queuedMouseEvents.push(MouseEvent.move);
+        queuedMousePayloads.push([e.clientX, e.clientY]);
+    });
+
+    this.process = function (mouseButtonPressed, mouseMoved) {
+        var count = queuedMouseEvents.length;
+        if (count > 0) {
+            for (var i = 0; i < count; i++) {
+                var event = queuedMouseEvents[i];
+                var payload = queuedMousePayloads[i];
+                switch (event) {
+                    case MouseEvent.down:
+                    case MouseEvent.up:
+                        mouseButtonPressed(payload[2], event == MouseEvent.down, payload[0], payload[1]);
+                        break;
+
+                    case MouseEvent.move:
+                        mouseMoved(payload[0], payload[1]);
+                        break;
+                }
+            }
+
+            queuedMouseEvents.length = 0;
+            queuedMousePayloads.length = 0;
+        }
+    };
+}
+
 var Radius = new function () {
     var keySerializer = new KeySerializer();
+    var mouseSerializer;
     var list = [];
     var canvas;
     var context;
@@ -394,6 +524,12 @@ var Radius = new function () {
     this.popLayer = function () {
         list.shift();
     };
+
+    var convertToCanvasCoordinates = function (globalX, globalY) {
+        // TODO: This rectangle could be cached... perhaps in an affine transform
+        var rect = canvas.getBoundingClientRect();
+        return [globalX - rect.left, globalY - rect.top];
+    }
 
     // Single loop iteration
     var loop = function () {
@@ -409,6 +545,33 @@ var Radius = new function () {
                 }
             });
 
+            var mouseButtonPressed = activeLayer.mouseButtonPressed;
+            var mouseMoved = activeLayer.mouseMoved;
+
+            // TODO: This could be cached and should also share code with the canvas 
+            // TODO: The API here is ugly...
+            var transform = Transform2D.createIdentity();
+            var scale = Radius.getScale();
+            Transform2D.scale(transform, scale, -scale, transform);
+            Transform2D.translate(transform, -canvas.width / 2, canvas.height / 2, transform);
+
+            mouseSerializer.process(function (button, pressed, globalX, globalY) {
+                if (mouseButtonPressed) {
+                    var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
+                    var canvasX = canvasCoordinates[0];
+                    var canvasY = canvasCoordinates[1];
+                    var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                    mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
+                }
+            }, function (globalX, globalY) {
+                // TODO: Combine code with above
+                var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
+                var canvasX = canvasCoordinates[0];
+                var canvasY = canvasCoordinates[1];
+                var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                mouseMoved(localCoordinates[0], localCoordinates[1]);
+            });
+
             // Update entities and draw everything
             // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)? Auto-pause?
             activeLayer.update();
@@ -422,6 +585,7 @@ var Radius = new function () {
     this.initialize = function (targetCanvas) {
         canvas = targetCanvas;
         context = canvas.getContext('2d');
+        mouseSerializer = new MouseSerializer(canvas);
     }
 
     this.start = function (layer) {
@@ -500,6 +664,7 @@ function Player() {
     Entity.call(this);
     this.color = 'green';
     this.v = [0, 0, 0, 0];
+    this.target = [];
     this.speed = 0.6 / 1000;
     this.width = 1 / 30;
     this.height = 1 / 30;
@@ -523,11 +688,27 @@ Player.prototype.setMovingRightState = function (pressed) {
     this.v[3] = pressed ? 1 : 0;
 };
 
+Player.prototype.setTarget = function (x, y) {
+    this.target[0] = x;
+    this.target[1] = y;
+};
+
+Player.prototype.updateTarget = function (x, y) {
+    if (this.target.length > 0) {
+        this.setTarget(x, y);
+    }
+}
+
+Player.prototype.clearTarget = function () {
+    this.target.length = 0;
+};
+
 Player.prototype.clearMovingStates = function () {
     this.v[0] = 0;
     this.v[1] = 0;
     this.v[2] = 0;
     this.v[3] = 0;
+    this.clearTarget();
 };
 
 Player.prototype.createGhost = function () {
@@ -537,25 +718,39 @@ Player.prototype.createGhost = function () {
 Player.prototype.update = function (ms) {
     var directionX = this.v[3] - this.v[2];
     var directionY = this.v[0] - this.v[1];
-    if (directionX || directionY) {
-        var direction = Math.atan2(directionY, directionX);
-        this.x += this.speed * ms * Math.cos(direction);
-        this.y += this.speed * ms * Math.sin(direction);
-
-        // Boundaries
-        if (Math.abs(this.x) + this.width / 2 > 0.5) {
-            if (this.x > 0) {
-                this.x = 0.5 - this.width / 2;
-            } else {
-                this.x = -0.5 + this.width / 2;
+    var target = this.target;
+    if (directionX || directionY || target.length > 0) {
+        var direction;
+        if (target.length > 0) {
+            // Only move if we're a little ways from the target
+            var dx = target[0] - this.x;
+            var dy = target[1] - this.y;
+            if (Math.abs(dx) > this.width / 4 || Math.abs(dy) > this.height / 4) {
+                direction = Math.atan2(dy, dx);
             }
+        } else {
+            direction = Math.atan2(directionY, directionX);
         }
 
-        if (Math.abs(this.y) + this.height / 2 > 0.5) {
-            if (this.y > 0) {
-                this.y = 0.5 - this.height / 2;
-            } else {
-                this.y = -0.5 + this.height / 2;
+        if (direction !== undefined) {
+            this.x += this.speed * ms * Math.cos(direction);
+            this.y += this.speed * ms * Math.sin(direction);
+
+            // Boundaries
+            if (Math.abs(this.x) + this.width / 2 > 0.5) {
+                if (this.x > 0) {
+                    this.x = 0.5 - this.width / 2;
+                } else {
+                    this.x = -0.5 + this.width / 2;
+                }
+            }
+
+            if (Math.abs(this.y) + this.height / 2 > 0.5) {
+                if (this.y > 0) {
+                    this.y = 0.5 - this.height / 2;
+                } else {
+                    this.y = -0.5 + this.height / 2;
+                }
             }
         }
     }
@@ -822,6 +1017,21 @@ function GameLayer() {
             board.player.setMovingDownState(pressed);
         }
     };
+
+    this.mouseButtonPressed = function (button, pressed, x, y) {
+        if (button == MouseButton.primary) {
+            if (pressed) {
+                // TODO: This is ugly
+                board.player.setTarget(x / board.width, y / board.height);
+            } else {
+                board.player.clearTarget();
+            }
+        }
+    };
+
+    this.mouseMoved = function (x, y) {
+        board.player.updateTarget(x / board.width, y / board.height);
+    }
 }
 
 GameLayer.prototype = Object.create(Layer.prototype);
