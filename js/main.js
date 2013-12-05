@@ -586,6 +586,9 @@ var Radius = new function () {
         canvas = targetCanvas;
         context = canvas.getContext('2d');
         mouseSerializer = new MouseSerializer(canvas);
+
+        // Disable default touch behavior (e.g. pan/bounce) for the canvas
+        canvas.setAttribute('style', 'touch-action: none;');
     }
 
     this.start = function (layer) {
