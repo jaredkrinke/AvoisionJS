@@ -248,28 +248,14 @@ function Entity() {
 Entity.prototype = {
     constructor: Entity,
 
-    // TODO (BREAKING): Should subclasses just manipulate the children array directly?
-    addChild: function (child) {
-        if (!this.children) {
-            this.children = [];
-        }
-
-        this.children.push(child);
-        return child;
-    },
-
     removeChild: function (child) {
-        var childCount = this.children.length;
-        for (var i = 0; i < childCount; i++) {
-            if (child === this.children[i]) {
-                this.children.splice(i, 1);
-            }
-        }
-    },
-
-    clearChildren: function () {
         if (this.children) {
-            this.children.length = 0;
+            var childCount = this.children.length;
+            for (var i = 0; i < childCount; i++) {
+                if (child === this.children[i]) {
+                    this.children.splice(i, 1);
+                }
+            }
         }
     },
 
@@ -759,7 +745,6 @@ function Board() {
     this.player = new Player();
     this.goal = new Goal();
     this.paused = false;
-    this.enemies = [];
     this.score = 0;
     this.scoreUpdated = new Event();
     this.points = 0;
@@ -845,15 +830,14 @@ Board.prototype.addEnemy = function () {
     // Animate in the new enemy
     var enemy = new Enemy(position[0], position[1], size, size, speedX, speedY);
     var board = this;
-    this.addChild(new Ghost(enemy, 500, 0, true, function () {
-        board.addChild(enemy);
-        board.enemies.push(enemy);
+    this.children.push(new Ghost(enemy, 500, 0, true, function () {
+        board.children.push(enemy);
     }));
 };
 
 Board.prototype.lose = function () {
     this.player.clearMovingStates();
-    this.addChild(this.player.createGhost());
+    this.children.push(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
     this.lost.fire();
@@ -861,7 +845,7 @@ Board.prototype.lose = function () {
 
 Board.prototype.captureGoal = function () {
     this.setScore(this.score + this.points);
-    this.addChild(this.goal.createGhost());
+    this.children.push(this.goal.createGhost());
     this.resetGoal();
     this.addEnemy();
 };
@@ -887,11 +871,14 @@ Board.prototype.update = function (ms) {
         }
 
         // Check for enemy intersection
-        var enemyCount = this.enemies.length;
-        for (var i = 0; i < enemyCount; i++) {
-            if (this.checkCollision(this.player, this.enemies[i])) {
-                done = true;
-                break;
+        var childCount = this.children.length;
+        for (var i = 0; i < childCount; i++) {
+            var child = this.children[i];
+            if (child instanceof Enemy) {
+                if (this.checkCollision(this.player, child)) {
+                    done = true;
+                    break;
+                }
             }
         }
 
@@ -912,11 +899,7 @@ Board.prototype.setPoints = function (points) {
 }
 
 Board.prototype.reset = function () {
-    this.clearChildren();
-    this.enemies.length = 0;
-
-    this.addChild(this.player);
-    this.addChild(this.goal);
+    this.children = [this.player, this.goal];
 
     this.setScore(0);
     this.resetGoal();
@@ -944,12 +927,14 @@ ValueDisplay.prototype = Object.create(Entity.prototype);
 
 function Display(board) {
     Entity.apply(this);
+    this.children = [];
+
     var font = '32px sans-serif';
     var textHeight = 32;
     var display = this;
     var addUpdateEffect = function () {
         var sign = (this.align === 'right') ? 1 : -1;
-        display.addChild(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
+        display.children.push(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
     }
 
     var scoreLabel = new Text('Score: ', font, -200, 200, 'left', 'bottom');
@@ -957,8 +942,8 @@ function Display(board) {
     var pointLabel = new Text('Points: ', font, 200 - padding, 200, 'right', 'bottom');
     this.elements = [scoreLabel, pointLabel];
     // TODO: Don't add the effect when the game first starts
-    this.scoreDisplay = this.addChild(new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
-    this.addChild(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
+    this.children.push(this.scoreDisplay = new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
+    this.children.push(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
 
     this.font = font;
     this.textHeight = textHeight;
@@ -975,7 +960,7 @@ Display.prototype.emphasizeScore = function () {
     background.color = 'blue';
     background.opacity = 0.85;
     var scaleMax = 2;
-    this.bigScore = this.addChild(new ScriptedEntity([background, textElement],
+    this.bigScore = this.children.push(new ScriptedEntity([background, textElement],
         [[0, -200 + this.textHeight / 2, 200, 1, 1, 1],
          [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 1]]));
 };
