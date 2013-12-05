@@ -86,9 +86,6 @@ var Transform2D = {
 
     // TODO: Is rotate needed?
     // TODO: Is invert needed?
-
-    // TODO: Needed?
-    //this.identity = this.createIdentity();
 };
 
 var keyCodeToName = {
@@ -148,7 +145,6 @@ Layer.prototype = {
             context.fillStyle = entity.color;
         }
 
-        // TODO: Check all implicit Boolean conversions to make sure zero (false) is handled correctly!
         if (entity.opacity !== undefined) {
             context.globalAlpha *= entity.opacity;
         }
@@ -247,13 +243,12 @@ function Entity() {
     this.width = 1;
     this.height = 1;
     this.color = 'white';
-    // TODO: Z order?
 }
 
 Entity.prototype = {
     constructor: Entity,
 
-    // TODO: Should subclasses just manipulate the children array directly?
+    // TODO (BREAKING): Should subclasses just manipulate the children array directly?
     addChild: function (child) {
         if (!this.children) {
             this.children = [];
@@ -325,7 +320,7 @@ function ScriptedEntity(entityOrElements, steps, repeat, endedCallback) {
     this.y = steps[0][2];
     this.width = steps[0][3];
     this.height = steps[0][4];
-    // TODO: Angle?
+    // TODO (BREAKING): Angle?
     this.opacity = steps[0][5];
 }
 
@@ -516,7 +511,7 @@ var Radius = new function () {
     var canvas;
     var context;
 
-    // TODO: Shown handlers, etc.
+    // TODO (BREAKING): Shown handlers, etc.
     this.pushLayer = function (layer) {
         list.unshift(layer);
     };
@@ -578,7 +573,6 @@ var Radius = new function () {
             activeLayer.draw(canvas, context);
         }
 
-        // TODO: setInterval or requestAnimationFrame?
         requestAnimationFrame(loop);
     };
 
@@ -596,7 +590,6 @@ var Radius = new function () {
         loop();
     }
 
-    // TODO: Needed? (Probably yes for mouse clicks, etc.)
     this.getScale = function () {
         return Math.min(canvas.width / 640, canvas.height / 480);
     }
@@ -649,7 +642,6 @@ Enemy.prototype.update = function (ms) {
 };
 
 function Goal() {
-    // TODO: Speeds/movement
     Entity.call(this);
     this.width = 1 / 30;
     this.height = 1 / 30;
@@ -783,7 +775,6 @@ Board.timeout = 19000;
 Board.prototype = Object.create(Entity.prototype);
 
 Board.prototype.resetGoal = function () {
-    // TODO: Speed/movement
     // TODO: Difficulty
     var position = this.getSafePosition(this.goal.width, this.goal.height);
     this.goal.x = position[0];
@@ -907,8 +898,6 @@ Board.prototype.update = function (ms) {
         if (done) {
             this.lose();
         }
-
-        // TODO: Animations
     }
 };
 
