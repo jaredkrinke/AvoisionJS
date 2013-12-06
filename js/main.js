@@ -517,7 +517,7 @@ var Radius = new function () {
     var canvas;
     var context;
 
-    // TODO (BREAKING): Shown handlers, etc.
+    // TODO: Shown handlers, etc.
     this.pushLayer = function (layer) {
         list.unshift(layer);
     };
