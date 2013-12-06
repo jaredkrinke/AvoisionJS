@@ -139,7 +139,14 @@ Layer.prototype = {
     drawEntity: function (canvas, context, entity) {
         context.save();
         context.translate(entity.x, entity.y);
-        context.scale(entity.width, entity.height);
+
+        if (entity.width !== 1 || entity.height !== 1) {
+            context.scale(entity.width, entity.height);
+        }
+
+        if (entity.angle) {
+            context.rotate(entity.angle);
+        }
 
         if (entity.color) {
             context.fillStyle = entity.color;
@@ -242,6 +249,7 @@ function Entity() {
     this.y = 0;
     this.width = 1;
     this.height = 1;
+    this.angle = 0;
     this.color = 'white';
 }
 
@@ -306,8 +314,8 @@ function ScriptedEntity(entityOrElements, steps, repeat, endedCallback) {
     this.y = steps[0][2];
     this.width = steps[0][3];
     this.height = steps[0][4];
-    // TODO (BREAKING): Angle?
-    this.opacity = steps[0][5];
+    this.angle = steps[0][5];
+    this.opacity = steps[0][6];
 }
 
 ScriptedEntity.prototype = Object.create(Entity.prototype);
@@ -323,6 +331,7 @@ ScriptedEntity.prototype.update = function (ms) {
         this.initialY = this.y;
         this.initialWidth = this.width;
         this.initialHeight = this.height;
+        this.initialAngle = this.angle;
         this.initialOpacity = this.opacity;
 
         if (this.stepIndex >= this.steps.length) {
@@ -346,7 +355,8 @@ ScriptedEntity.prototype.update = function (ms) {
         this.y = this.initialY + (step[2] - this.initialY) / step[0] * this.timer;
         this.width = this.initialWidth + (step[3] - this.initialWidth) / step[0] * this.timer;
         this.height = this.initialHeight + (step[4] - this.initialHeight) / step[0] * this.timer;
-        this.opacity = this.initialOpacity + (step[5] - this.initialOpacity) / step[0] * this.timer;
+        this.angle = this.initialAngle + (step[5] - this.initialAngle) / step[0] * this.timer;
+        this.opacity = this.initialOpacity + (step[6] - this.initialOpacity) / step[0] * this.timer;
     } else {
         var step = this.steps[this.steps.length - 1];
 
@@ -354,7 +364,8 @@ ScriptedEntity.prototype.update = function (ms) {
         this.y = step[2];
         this.width = step[3];
         this.height = step[4];
-        this.opacity = step[5];
+        this.angle = step[5];
+        this.opacity = step[6];
     }
 };
 
@@ -387,8 +398,8 @@ function Ghost(entity, period, scaleMax, inward, endedCallback, offsetX2, offset
     ScriptedEntity.call(
         this,
         entity,
-        [[0, entity.x, entity.y, entity.width * initialScale, entity.height * initialScale, opacity],
-         [period, x2, y2, entity.width * finalScale, entity.height * finalScale, finalOpacity]],
+        [[0, entity.x, entity.y, entity.width * initialScale, entity.height * initialScale, entity.angle, opacity],
+         [period, x2, y2, entity.width * finalScale, entity.height * finalScale, entity.angle, finalOpacity]],
         false,
         function () {
             this.dead = true;
@@ -970,8 +981,8 @@ Display.prototype.emphasizeScore = function () {
     background.opacity = 0.85;
     var scaleMax = 2;
     this.bigScore = this.children.push(new ScriptedEntity([background, textElement],
-        [[0, -200 + this.textHeight / 2, 200, 1, 1, 1],
-         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 1]]));
+        [[0, -200 + this.textHeight / 2, 200, 1, 1, 0, 1],
+         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 0, 1]]));
 };
 
 function GameLayer() {
