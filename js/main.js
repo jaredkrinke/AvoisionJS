@@ -450,18 +450,27 @@ var MouseButton = {
 function MouseSerializer(canvas) {
     var queuedMouseEvents = [];
     var queuedMousePayloads = [];
+    var disableDefault = function (e) {
+        // Disable the default action since the layer will handle this event
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+    }
 
     canvas.addEventListener('mousedown', function (e) {
+        disableDefault(e);
         queuedMouseEvents.push(MouseEvent.down);
         queuedMousePayloads.push([e.clientX, e.clientY, e.button]);
     });
 
     canvas.addEventListener('mouseup', function (e) {
+        disableDefault(e);
         queuedMouseEvents.push(MouseEvent.up);
         queuedMousePayloads.push([e.clientX, e.clientY, e.button]);
     });
 
     canvas.addEventListener('mousemove', function (e) {
+        disableDefault(e);
         queuedMouseEvents.push(MouseEvent.move);
         queuedMousePayloads.push([e.clientX, e.clientY]);
     });
