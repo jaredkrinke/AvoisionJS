@@ -1,25 +1,67 @@
-﻿function Player() {
+﻿function Target(x, y) {
+    Entity.apply(this);
+    this.x = x;
+    this.y = y;
+    this.width = 16;
+    this.height = 16;
+    this.elements = [new Rectangle()];
+    this.color = 'brown';
+}
+
+Target.prototype = Object.create(Entity.prototype);
+
+function Player() {
+    Entity.apply(this);
+    this.x = -240;
+    this.y = 160;
     this.width = 32;
     this.height = 16;
     this.elements = [new Rectangle()];
     this.color = 'white';
 }
 
+Player.prototype = Object.create(Entity.prototype);
+
 function Board() {
     Entity.call(this);
-    this.children = [new Player()];
+    this.player = new Player();
 }
 
 Board.prototype = Object.create(Entity.prototype);
+Board.verticalLevels = [-100, -60, -20];
+Board.horizontalMin = -360;
+Board.horizontalMax = 360;
+Board.targetFrequency = 1000;
+Board.initialSpeed = 200 / 1000;
 
 Board.prototype.reset = function () {
-    // TODO
+    this.children = [this.player];
+    this.timer = 0;
+    this.speed = Board.initialSpeed;
 };
 
 Board.prototype.update = function (ms) {
-    // TODO
-    // Update children first
-    //this.updateChildren(ms);
+    // Move objects
+    for (var i = 0; i < this.children.length; i++) {
+        var child = this.children[i];
+        if (!(child instanceof Player)) {
+            // Move non-player entities to the left
+            child.x -= this.speed * ms;
+
+            // Check for objects that are out of bounds
+            if (child.x < Board.horizontalMin) {
+                this.children.splice(i, 1);
+                i--;
+            }
+        }
+    }
+
+    // Add new targets
+    this.timer += ms;
+    if (this.timer > Board.targetFrequency) {
+        this.timer -= Board.targetFrequency;
+        this.children.push(new Target(Board.horizontalMax, Board.verticalLevels[Math.floor(Math.random() * Board.verticalLevels.length)]));
+    }
 };
 
 function GameLayer() {
