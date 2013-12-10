@@ -565,12 +565,14 @@ var Radius = new function () {
                     mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
                 }
             }, function (globalX, globalY) {
-                // TODO: Combine code with above
-                var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
-                var canvasX = canvasCoordinates[0];
-                var canvasY = canvasCoordinates[1];
-                var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
-                mouseMoved(localCoordinates[0], localCoordinates[1]);
+                if (mouseMoved) {
+                    // TODO: Combine code with above
+                    var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
+                    var canvasX = canvasCoordinates[0];
+                    var canvasY = canvasCoordinates[1];
+                    var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                    mouseMoved(localCoordinates[0], localCoordinates[1]);
+                }
             });
 
             // Update entities and draw everything
