@@ -37,21 +37,40 @@ Package.prototype.update = function (ms) {
     this.y += this.vy * ms;
 };
 
-function Player() {
+function Player(board) {
     Entity.apply(this);
+    this.board = board;
     this.x = -240;
     this.y = 160;
     this.width = 32;
     this.height = 16;
     this.elements = [new Rectangle()];
     this.color = 'white';
+    this.packageTimer = 0;
+    this.dropping = false;
 }
 
 Player.prototype = Object.create(Entity.prototype);
+Player.packageFrequency = 400;
+
+Player.prototype.setDropping = function (pressed) {
+    this.dropping = pressed;
+};
+
+Player.prototype.update = function (ms) {
+    this.packageTimer = Math.max(this.packageTimer - ms, 0);
+
+    if (this.dropping) {
+        if (this.packageTimer <= 0) {
+            this.board.dropPackage();
+            this.packageTimer += Player.packageFrequency;
+        }
+    }
+};
 
 function Board() {
     Entity.call(this);
-    this.player = new Player();
+    this.player = new Player(this);
 }
 
 Board.prototype = Object.create(Entity.prototype);
@@ -101,17 +120,13 @@ function GameLayer() {
     var board = this.board;
     this.keyPressed = {
         space: function (pressed) {
-            board.dropPackage();
+            board.player.setDropping(pressed);
         }
     };
 
     this.mouseButtonPressed = function (button, pressed, x, y) {
-        if (button == MouseButton.primary) {
-            if (pressed) {
-                // TODO
-            } else {
-                // TODO
-            }
+        if (button === MouseButton.primary) {
+            board.player.setDropping(pressed);
         }
     };
 }
