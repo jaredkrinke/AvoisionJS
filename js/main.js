@@ -3,13 +3,22 @@
     this.board = board;
     this.x = x;
     this.y = y;
-    this.width = 16;
-    this.height = 16;
-    this.elements = [new Rectangle()];
-    this.color = 'brown';
+
+    // Create chimney and house elements
+    var width = 24;
+    var height = 32;
+    var chimney = new Rectangle(-width / 2, 0, width, height);
+    chimney.color = 'brown';
+    // TODO: Height isn't working as expected...
+    var house = new Rectangle(-Target.horizontalSpan * 3 / 4, -height, Target.horizontalSpan, y - height - Target.verticalBaseline);
+    house.color = 'green';
+
+    this.elements = [chimney, house];
 }
 
 Target.prototype = Object.create(Entity.prototype);
+Target.verticalBaseline = -220;
+Target.horizontalSpan = 100;
 
 Target.prototype.update = function (ms) {
     this.x += this.board.vx * ms;
@@ -20,8 +29,8 @@ function Package(board, x, y) {
     this.board = board;
     this.x = x;
     this.y = y;
-    this.width = 8;
-    this.height = 8;
+    this.width = 16;
+    this.height = 16;
     this.elements = [new Rectangle()];
     this.color = 'red';
     this.vx = -this.board.vx + 50 / 1000;
@@ -42,8 +51,8 @@ function Player(board) {
     this.board = board;
     this.x = -240;
     this.y = 160;
-    this.width = 32;
-    this.height = 16;
+    this.width = 64;
+    this.height = 32;
     this.elements = [new Rectangle()];
     this.color = 'white';
     this.packageTimer = 0;
@@ -71,13 +80,14 @@ Player.prototype.update = function (ms) {
 function Board() {
     Entity.call(this);
     this.player = new Player(this);
+    this.elements = [new Rectangle(-320, Target.verticalBaseline, 640, 240 - Target.verticalBaseline)];
 }
 
 Board.prototype = Object.create(Entity.prototype);
-Board.verticalLevels = [-100, -60, -20];
+Board.verticalLevels = [-60, -20, 20];
 Board.verticalMin = -500;
 Board.horizontalMin = -360;
-Board.horizontalMax = 360;
+Board.horizontalMax = 400;
 Board.targetFrequency = 1000;
 Board.initialSpeed = 200 / 1000;
 
