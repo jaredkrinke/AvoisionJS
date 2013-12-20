@@ -43,10 +43,11 @@ function Button(text, activated) {
     Label.call(this, text);
     this.active = true;
     this.textElement.color = Button.defaultColor;
+    this.activated = activated;
 }
 
 Button.defaultColor = 'white';
-Button.focusedColor = 'cyan';
+Button.focusedColor = 'blue';
 Button.disabledColor = 'gray';
 Button.prototype = Object.create(Label.prototype);
 
@@ -267,10 +268,10 @@ Form.prototype = {
 
     // TODO: moveLeft/moveRight
 
-    activate: function (event, source) {
+    activate: function () {
         var handled = false;
         if (this.focusedNode && this.focusedNode.activated) {
-            this.focusedNode.activated(source);
+            this.focusedNode.activated();
             handled = true;
         }
 

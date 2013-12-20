@@ -424,21 +424,30 @@ function GameLayer() {
 
 GameLayer.prototype = Object.create(Layer.prototype);
 
+GameLayer.prototype.reset = function () {
+    this.done = false;
+    this.board.reset();
+};
+
+function MainMenu() {
+    this.gameLayer = new GameLayer();
+
+    var mainMenu = this;
+    var form = Form.newFlow(3, -200, 200, 400, null,
+        new Button('Start New Game', function () { mainMenu.startNewGame(); }));
+    FormLayer.call(this, form);
+}
+
+MainMenu.prototype = Object.create(FormLayer.prototype);
+
+MainMenu.prototype.startNewGame = function () {
+    // TODO: Instructions, difficulty
+    this.gameLayer.reset();
+    Radius.pushLayer(this.gameLayer);
+};
+
 window.onload = function () {
     // TODO: Consider automatic resizing (e.g. to fill the screen)
     Radius.initialize(document.getElementById('canvas'));
-    //Radius.start(new GameLayer());
-    // TODO: Show a menu
-    var form = Form.newFlow(3, -200, 200, 400, null,
-        new Label('one'),
-        new Button('two'),
-        new Label('three'),
-        new Button('four'),
-        new Label('five'),
-        new Button('six'),
-        new Label('seven'),
-        new Button('eight'),
-        new Label('nine'),
-        new Button('TEN'));
-    Radius.start(new FormLayer(form));
+    Radius.start(new MainMenu());
 }
