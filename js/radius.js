@@ -109,6 +109,7 @@ function Layer() {
 Layer.prototype = {
     constructor: Layer,
 
+    // TODO: Maybe just call the property children and let callers manipulate directly?
     addEntity: function (entity) {
         this.entities.push(entity);
         return entity;
@@ -517,13 +518,25 @@ var Radius = new function () {
     var canvas;
     var context;
 
-    // TODO: Shown handlers, etc.
     this.pushLayer = function (layer) {
         list.unshift(layer);
+
+        // Run the "shown" handler, if it exists
+        if (layer.shown) {
+            layer.shown();
+        }
     };
 
     this.popLayer = function () {
         list.shift();
+
+        // Notify any top layer that is has been shown
+        if (list.length > 0) {
+            var layer = list[0];
+            if (layer.shown) {
+                layer.shown();
+            }
+        }
     };
 
     var convertToCanvasCoordinates = function (globalX, globalY) {

@@ -1,4 +1,7 @@
-﻿function Enemy(x, y, width, height, speedX, speedY) {
+﻿/// <reference path="radius.js" />
+/// <reference path="radius-ui.js" />
+
+function Enemy(x, y, width, height, speedX, speedY) {
     Entity.call(this);
     this.x = x;
     this.y = y;
@@ -424,5 +427,18 @@ GameLayer.prototype = Object.create(Layer.prototype);
 window.onload = function () {
     // TODO: Consider automatic resizing (e.g. to fill the screen)
     Radius.initialize(document.getElementById('canvas'));
-    Radius.start(new GameLayer());
+    //Radius.start(new GameLayer());
+    // TODO: Show a menu
+    var form = Form.newFlow(3, -200, 200, 400, null,
+        new Label('one'),
+        new Label('two'),
+        new Label('three'),
+        new Label('four'),
+        new Label('five'),
+        new Label('six'),
+        new Label('seven'),
+        new Label('eight'),
+        new Label('nine'),
+        new Label('TEN'));
+    Radius.start(new FormLayer(form));
 }
