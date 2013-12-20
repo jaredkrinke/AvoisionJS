@@ -2,12 +2,12 @@
 
 function Label(text, alignment) {
     Entity.apply(this);
-    // TODO: Need to set font...
-    this.elements = [this.textElement = new Text(text, '10px sans-serif')];
-    // TODO: Need to account for font height
-    this.totalHeight = 10;
+    this.elements = [this.textElement = new Text(text, Label.font)];
+    this.totalHeight = Label.textHeight;
 }
 
+Label.textHeight = 24;
+Label.font = Label.textHeight + 'px sans-serif';
 Label.prototype = Object.create(Entity.prototype);
 
 Label.prototype.setLayer = function (layer) {
@@ -28,7 +28,7 @@ Label.prototype.getActive = function () {
 };
 
 Label.prototype.getMinimumSize = function () {
-    return [Radius.getTextWidth(this.font, this.text), this.totalHeight];
+    return [this.textElement.getTotalWidth(), this.totalHeight];
 };
 
 Label.prototype.getSize = function () {
@@ -40,13 +40,13 @@ Label.prototype.setSize = function (width, height) {
 };
 
 function Button(text, activated) {
-    Label.apply(this);
+    Label.call(this, text);
     this.active = true;
     this.textElement.color = Button.defaultColor;
 }
 
 Button.defaultColor = 'white';
-Button.focusedColor = 'green';
+Button.focusedColor = 'cyan';
 Button.disabledColor = 'gray';
 Button.prototype = Object.create(Label.prototype);
 
@@ -73,12 +73,6 @@ function Form(x, y, desiredWidth, desiredHeight) {
     this.y = y;
     this.desiredWidth = desiredWidth;
     this.desiredHeight = desiredHeight;
-
-    this.keyPressed = {
-        up: this.moveFocusUp,
-        down: this.moveFocusDown,
-        enter: this.activate
-    };
 }
 
 Form.prototype = {
@@ -250,8 +244,8 @@ Form.prototype = {
         if (oldNode) {
             i = this.getComponentIndex(oldNode);
         } else {
-            // Start with the last component
-            i = components.length;
+            // Start before the first component
+            i = -1;
         }
 
         // Iterate to next active node
@@ -385,13 +379,28 @@ function FormLayer(form) {
     this.form = form;
     form.setLayer(this);
     form.focused();
+    this.keyPressed = {
+        up: function (pressed) {
+            if (pressed) {
+                this.form.moveFocusUp();
+            }
+        },
+
+        down: function (pressed) {
+            if (pressed) {
+                this.form.moveFocusDown();
+            }
+        },
+
+        enter: function (pressed) {
+            if (pressed) {
+                this.form.activate();
+            }
+        }
+    };
 }
 
 FormLayer.prototype = Object.create(Layer.prototype);
-
-FormLayer.prototype.keyPressed = function (key, pressed) {
-    return this.form.keyPressed(key, pressed);
-};
 
 FormLayer.prototype.show = function () {
     Radius.pushLayer(this);

@@ -431,14 +431,14 @@ window.onload = function () {
     // TODO: Show a menu
     var form = Form.newFlow(3, -200, 200, 400, null,
         new Label('one'),
-        new Label('two'),
+        new Button('two'),
         new Label('three'),
-        new Label('four'),
+        new Button('four'),
         new Label('five'),
-        new Label('six'),
+        new Button('six'),
         new Label('seven'),
-        new Label('eight'),
+        new Button('eight'),
         new Label('nine'),
-        new Label('TEN'));
+        new Button('TEN'));
     Radius.start(new FormLayer(form));
 }

@@ -555,7 +555,7 @@ var Radius = new function () {
             keySerializer.process(function (key, pressed) {
                 var keyPressedHandler = keyPressed[key];
                 if (keyPressedHandler) {
-                    keyPressedHandler(pressed);
+                    keyPressedHandler.call(activeLayer, pressed);
                 }
             });
 
