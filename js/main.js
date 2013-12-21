@@ -474,11 +474,13 @@ function MainMenu() {
     this.gameLayer = new GameLayer();
 
     var mainMenu = this;
-    var form = Form.newFlow(1, undefined, undefined, undefined, undefined,
+    FormLayer.call(this, new NestedFlowForm(1, [
         new Title('Avoision'),
         new Separator(),
-        new Button('Start New Game', function () { mainMenu.startNewGame(); }));
-    FormLayer.call(this, form);
+        new Button('Start New Game', function () { mainMenu.startNewGame(); }),
+        new Title('Avoision'),
+        new Title('Avoision')
+    ]));
 }
 
 MainMenu.prototype = Object.create(FormLayer.prototype);

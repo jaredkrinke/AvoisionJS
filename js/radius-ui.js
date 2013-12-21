@@ -4,8 +4,9 @@ function Label(text, alignment, textHeight, font) {
     Entity.apply(this);
     this.elements = [this.textElement = new Text(text, font || Label.font)];
     this.alignment = alignment || 'left';
-    this.totalWidth = 0;
     this.totalHeight = textHeight || Label.textHeight;
+    var size = this.getMinimumSize();
+    this.totalWidth = size[0];
 }
 
 Label.textHeight = 24;
@@ -17,11 +18,13 @@ Label.alignmentToSetX = {
     },
 
     center: function (x) {
+        // TODO: This sets it to the very middle, but text alignment works differently here
         var size = this.getSize();
         this.x = x + size[0] / 2;
     },
 
     right: function (x) {
+        // TODO: Text element alignment works differently here as well
         var size = this.getSize();
         this.x = x + size[0];
     }
@@ -32,10 +35,12 @@ Label.prototype.setLayer = function (layer) {
 };
 
 Label.prototype.getPosition = function () {
-    return [this.x, this.y + this.totalHeight];
+    return [this.componentX, this.componentY];
 };
 
 Label.prototype.setPosition = function (x, y) {
+    this.componentX = x;
+    this.componentY = y;
     var setX = Label.alignmentToSetX[this.alignment];
     setX.call(this, x);
     this.y = y - this.totalHeight;
@@ -66,6 +71,8 @@ Label.prototype.setSize = function (width, height) {
     }
 
     this.totalWidth = width;
+    var position = this.getPosition();
+    this.setPosition(position[0], position[1]);
 };
 
 function Separator() {
@@ -111,12 +118,19 @@ Button.prototype.unfocused = function () {
     this.textElement.color = Button.defaultColor;
 };
 
-function Form(x, y, desiredWidth, desiredHeight) {
-    this.components = [];
+function Form(x, y, desiredWidth, desiredHeight, layout, components) {
     this.x = (x !== undefined) ? x : Form.defaultX;
     this.y = (y !== undefined) ? y : Form.defaultY;
     this.desiredWidth = desiredWidth || Form.defaultWidth;
     this.desiredHeight = desiredHeight;
+    this.layout = layout;
+
+    if (components) {
+        this.components = components;
+        this.layout();
+    } else {
+        this.components = [];
+    }
 }
 
 Form.defaultX = -200;
@@ -125,106 +139,6 @@ Form.defaultWidth = 400;
 
 Form.prototype = {
     constructor: Form,
-
-    layoutInternal: function (pad) {
-        var columns = this.columns || 1;
-
-        // Determine minimum column widths
-        var columnWidths = [];
-        var rowMinimumWidths = [0];
-        var rowHeights = [0];
-        var column;
-        var row = 0;
-
-        for (column = 0; column < columns; column++) {
-            columnWidths[column] = 0;
-        }
-
-        var components = this.components;
-        var componentCount = components.length;
-        var i;
-        for (column = 0, i = 0; i < componentCount; i++) {
-            var component = components[i];
-            var minimumSize = component.getMinimumSize();
-            columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
-            rowMinimumWidths[row] += minimumSize[0];
-            rowHeights[row] = Math.max(rowHeights[row], minimumSize[1]);
-            column = column++ % columns;
-
-            if (column === 0) {
-                row++;
-                rowMinimumWidths[row] = 0;
-                rowHeights[row] = 0;
-            }
-        }
-
-        // Calculate total width
-        var minimumWidth = 0;
-        for (column = 0; column < columns; column++) {
-            minimumWidth += columnWidths[column];
-        }
-
-        this.minimumWidth = minimumWidth;
-
-        // Check for size constraints
-        if (this.desiredWidth) {
-            // Add padding (or negative padding)
-            var padding = (this.desiredWidth - minimumWidth) / columns;
-            if (!pad && padding > 0) {
-                padding = 0;
-            }
-
-            // Add padding
-            for (column = 0; column < columns; column++) {
-                columnWidths[column] += padding;
-            }
-        }
-
-        // Layout components
-        var x = this.x;
-        var y = this.y;
-        var rowHeight = 0;
-        var totalMinimumHeight = 0;
-        column = -1;
-        row = -1;
-
-        for (i = 0; i < componentCount; i++) {
-            if (column === -1 || column >= columns - 1) {
-                // Last column; move to next row
-                if (row >= 0) {
-                    y -= rowHeights[row];
-                    totalMinimumHeight += rowHeights[row];
-                }
-
-                x = this.x;
-                column = 0;
-                row++;
-
-                // TODO: Special case for centered flow layout
-            } else {
-                column++;
-            }
-
-            var componentWidth = columnWidths[column];
-            var component = components[i];
-            component.setPosition(x, y);
-
-            // Flow layout doesn't fill the entire column
-            if (!pad) {
-                var minimumSize = component.getMinimumSize();
-                componentWidth = minimumSize[0];
-            }
-
-            component.setSize(componentWidth, rowHeights[row]);
-            x += componentWidth;
-        }
-
-        if (rowHeights[row]) {
-            totalMinimumHeight += rowHeights[row];
-        }
-
-        this.minimumHeight = totalMinimumHeight;
-    },
 
     changeFocus: function (newlyFocusedNode, event) {
         var lastFocusedNode = this.focusedNode;
@@ -333,11 +247,6 @@ Form.prototype = {
         this.layout();
     },
 
-    layout: function () {
-        // TODO: Allow grid layout
-        this.layoutInternal(false);
-    },
-
     setLayer: function (layer) {
         var components = this.components;
         var componentCount = components.length;
@@ -409,18 +318,139 @@ Form.prototype = {
     // TODO: Nested focus/unfocus
 };
 
-Form.newFlow = function (columns, x, y, desiredWidth, desiredHeight) {
-    var form = new Form(x, y, desiredWidth, desiredHeight);
-    form.columns = columns;
+var columnLayout = function (pad) {
+    var columns = this.columns || 1;
 
-    // Add all components
-    var argumentCount = arguments.length;
-    for (var i = 5; i < argumentCount; i++) {
-        form.add(arguments[i]);
+    // Determine minimum column widths
+    var columnWidths = [];
+    var rowMinimumWidths = [0];
+    var rowHeights = [0];
+    var column;
+    var row = 0;
+
+    for (column = 0; column < columns; column++) {
+        columnWidths[column] = 0;
     }
 
-    return form;
+    var components = this.components;
+    var componentCount = components.length;
+    var i;
+    for (column = 0, i = 0; i < componentCount; i++) {
+        var component = components[i];
+        var minimumSize = component.getMinimumSize();
+        columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
+        rowMinimumWidths[row] += minimumSize[0];
+        rowHeights[row] = Math.max(rowHeights[row], minimumSize[1]);
+        column = column++ % columns;
+
+        if (column === 0) {
+            row++;
+            rowMinimumWidths[row] = 0;
+            rowHeights[row] = 0;
+        }
+    }
+
+    // Calculate total width
+    var minimumWidth = 0;
+    for (column = 0; column < columns; column++) {
+        minimumWidth += columnWidths[column];
+    }
+
+    this.minimumWidth = minimumWidth;
+
+    // Check for size constraints
+    if (this.desiredWidth) {
+        // Add padding (or negative padding)
+        var padding = (this.desiredWidth - minimumWidth) / columns;
+        if (!pad && padding > 0) {
+            padding = 0;
+        }
+
+        // Add padding
+        for (column = 0; column < columns; column++) {
+            columnWidths[column] += padding;
+        }
+    }
+
+    // Layout components
+    var x = this.x;
+    var y = this.y;
+    var rowHeight = 0;
+    var totalMinimumHeight = 0;
+    column = -1;
+    row = -1;
+
+    for (i = 0; i < componentCount; i++) {
+        if (column === -1 || column >= columns - 1) {
+            // Last column; move to next row
+            if (row >= 0) {
+                y -= rowHeights[row];
+                totalMinimumHeight += rowHeights[row];
+            }
+
+            x = this.x;
+            column = 0;
+            row++;
+
+            // TODO: Special case for centered flow layout
+        } else {
+            column++;
+        }
+
+        var componentWidth = columnWidths[column];
+        var component = components[i];
+        component.setPosition(x, y);
+
+        // Flow layout doesn't fill the entire column
+        if (!pad) {
+            var minimumSize = component.getMinimumSize();
+            componentWidth = minimumSize[0];
+        }
+
+        component.setSize(componentWidth, rowHeights[row]);
+        x += componentWidth;
+    }
+
+    if (rowHeights[row]) {
+        totalMinimumHeight += rowHeights[row];
+    }
+
+    this.minimumHeight = totalMinimumHeight;
 };
+
+// Flow forms
+function FlowForm(columns, x, y, desiredWidth, desiredHeight, components) {
+    Form.call(this, x, y, desiredWidth, desiredHeight, FlowForm.layout, components)
+}
+
+FlowForm.layout = function () {
+    columnLayout.call(this, false);
+};
+
+FlowForm.prototype = Object.create(Form.prototype);
+
+function NestedFlowForm(columns, components) {
+    FlowForm.call(this, columns, undefined, undefined, undefined, undefined, components);
+}
+
+NestedFlowForm.prototype = Object.create(FlowForm.prototype);
+
+// Grid forms
+function GridForm(columns, x, y, desiredWidth, desiredHeight, components) {
+    Form.call(this, x, y, desiredWidth, desiredHeight, GridForm.layout, components)
+}
+
+GridForm.layout = function () {
+    columnLayout.call(this, true);
+};
+
+GridForm.prototype = Object.create(Form.prototype);
+
+function NestedGridForm(columns, components) {
+    GridForm.call(this, columns, undefined, undefined, undefined, undefined, components);
+}
+
+NestedGridForm.prototype = Object.create(GridForm.prototype);
 
 function FormLayer(form) {
     Layer.apply(this);
