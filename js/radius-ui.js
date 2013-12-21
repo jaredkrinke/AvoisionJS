@@ -69,8 +69,6 @@ Label.prototype.setSize = function (width, height) {
     }
 
     this.totalWidth = width;
-    var position = this.getPosition();
-    this.setPosition(position[0], position[1]);
 };
 
 function Separator() {
@@ -339,7 +337,7 @@ var columnLayout = function (pad) {
         columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
         rowMinimumWidths[row] += minimumSize[0];
         rowHeights[row] = Math.max(rowHeights[row], minimumSize[1]);
-        column = column++ % columns;
+        column = (column + 1) % columns;
 
         if (column === 0) {
             row++;
@@ -375,12 +373,12 @@ var columnLayout = function (pad) {
     var y = this.y;
     var rowHeight = 0;
     var totalMinimumHeight = 0;
-    column = -1;
+    column = columns;
     row = -1;
 
-    for (i = 0; i < componentCount; i++) {
-        if (column === -1 || column >= columns - 1) {
-            // Last column; move to next row
+    for (i = 0; i < componentCount; i++, column++) {
+        if (column >= columns) {
+            // Past last column; move to next row
             if (row >= 0) {
                 y -= rowHeights[row];
                 totalMinimumHeight += rowHeights[row];
@@ -391,13 +389,10 @@ var columnLayout = function (pad) {
             row++;
 
             // TODO: Special case for centered flow layout
-        } else {
-            column++;
         }
 
         var componentWidth = columnWidths[column];
         var component = components[i];
-        component.setPosition(x, y);
 
         // Flow layout doesn't fill the entire column
         if (!pad) {
@@ -406,6 +401,7 @@ var columnLayout = function (pad) {
         }
 
         component.setSize(componentWidth, rowHeights[row]);
+        component.setPosition(x, y);
         x += componentWidth;
     }
 
