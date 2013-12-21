@@ -1,14 +1,31 @@
 ﻿/// <reference path="radius.js" />
 
-function Label(text, alignment) {
+function Label(text, alignment, textHeight, font) {
     Entity.apply(this);
-    this.elements = [this.textElement = new Text(text, Label.font)];
-    this.totalHeight = Label.textHeight;
+    this.elements = [this.textElement = new Text(text, font || Label.font)];
+    this.alignment = alignment || 'left';
+    this.totalWidth = 0;
+    this.totalHeight = textHeight || Label.textHeight;
 }
 
 Label.textHeight = 24;
 Label.font = Label.textHeight + 'px sans-serif';
 Label.prototype = Object.create(Entity.prototype);
+Label.alignmentToSetX = {
+    left: function (x) {
+        this.x = x;
+    },
+
+    center: function (x) {
+        var size = this.getSize();
+        this.x = x + size[0] / 2;
+    },
+
+    right: function (x) {
+        var size = this.getSize();
+        this.x = x + size[0];
+    }
+};
 
 Label.prototype.setLayer = function (layer) {
     layer.addEntity(this);
@@ -19,7 +36,8 @@ Label.prototype.getPosition = function () {
 };
 
 Label.prototype.setPosition = function (x, y) {
-    this.x = x;
+    var setX = Label.alignmentToSetX[this.alignment];
+    setX.call(this, x);
     this.y = y - this.totalHeight;
 };
 
@@ -31,13 +49,38 @@ Label.prototype.getMinimumSize = function () {
     return [this.textElement.getTotalWidth(), this.totalHeight];
 };
 
-Label.prototype.getSize = function () {
+Label.prototype.getDesiredSize = function () {
     return this.getMinimumSize();
 };
 
-Label.prototype.setSize = function (width, height) {
-    // Don't need to do anything here
+Label.prototype.getSize = function () {
+    return [this.totalWidth, this.totalHeight];
 };
+
+Label.prototype.setSize = function (width, height) {
+    if (this.alignment === 'right') {
+        // Add padding
+        if (this.x !== undefined) {
+            this.x += width - this.totalWidth;
+        }
+    }
+
+    this.totalWidth = width;
+};
+
+function Separator() {
+    Label.call(this, ' ');
+}
+
+Separator.prototype = Object.create(Label.prototype);
+
+function Title(text) {
+    Label.call(this, text, 'center', Title.textHeight, Title.font);
+}
+
+Title.textHeight = 32;
+Title.font = Title.textHeight + 'px sans-serif';
+Title.prototype = Object.create(Label.prototype);
 
 function Button(text, activated) {
     Label.call(this, text);

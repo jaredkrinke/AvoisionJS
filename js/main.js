@@ -474,7 +474,9 @@ function MainMenu() {
     this.gameLayer = new GameLayer();
 
     var mainMenu = this;
-    var form = Form.newFlow(3, undefined, undefined, undefined, undefined,
+    var form = Form.newFlow(1, undefined, undefined, undefined, undefined,
+        new Title('Avoision'),
+        new Separator(),
         new Button('Start New Game', function () { mainMenu.startNewGame(); }));
     FormLayer.call(this, form);
 }
