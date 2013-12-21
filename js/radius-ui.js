@@ -418,7 +418,8 @@ var columnLayout = function (pad) {
 
 // Flow forms
 function FlowForm(columns, x, y, desiredWidth, desiredHeight, components) {
-    Form.call(this, x, y, desiredWidth, desiredHeight, FlowForm.layout, components)
+    this.columns = columns;
+    Form.call(this, x, y, desiredWidth, desiredHeight, FlowForm.layout, components);
 }
 
 FlowForm.layout = function () {
@@ -435,7 +436,8 @@ NestedFlowForm.prototype = Object.create(FlowForm.prototype);
 
 // Grid forms
 function GridForm(columns, x, y, desiredWidth, desiredHeight, components) {
-    Form.call(this, x, y, desiredWidth, desiredHeight, GridForm.layout, components)
+    this.columns = columns;
+    Form.call(this, x, y, desiredWidth, desiredHeight, GridForm.layout, components);
 }
 
 GridForm.layout = function () {
