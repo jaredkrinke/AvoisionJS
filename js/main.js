@@ -162,11 +162,13 @@ function Board() {
     this.pointsUpdated = new Event();
     this.points = 30;
     this.lost = new Event();
+    this.completed = new Event();
     this.elements = [new Rectangle()];
 }
 
 Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 Board.timeout = 19000;
+Board.transitionPeriod = 1000;
 
 Board.prototype = Object.create(Entity.prototype);
 
@@ -251,6 +253,7 @@ Board.prototype.lose = function () {
     this.children.push(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
+    this.finishTimer = this.timer + Board.transitionPeriod;
     this.lost.fire();
 }
 
@@ -296,6 +299,10 @@ Board.prototype.update = function (ms) {
         if (done) {
             this.lose();
         }
+    } else {
+        if (this.finishTimer > 0 && this.timer >= this.finishTimer) {
+            this.completed.fire();
+        }
     }
 };
 
@@ -310,9 +317,10 @@ Board.prototype.setPoints = function (points) {
 }
 
 Board.prototype.reset = function () {
-    this.children = [this.player, this.goal];
-
+    this.paused = false;
+    this.finishTimer = 0;
     this.setScore(0);
+    this.children = [this.player, this.goal];
     this.resetGoal();
 };
 
@@ -371,13 +379,23 @@ Display.prototype.emphasizeScore = function () {
     background.color = 'blue';
     background.opacity = 0.85;
     var scaleMax = 2;
-    this.bigScore = this.children.push(new ScriptedEntity([background, textElement],
+    this.children.push(this.bigScore = new ScriptedEntity([background, textElement],
         [[0, -200 + this.textHeight / 2, 200, 1, 1, 0, 1],
          [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 0, 1]]));
 };
 
+Display.prototype.reset = function () {
+    // TODO: Suppress effects?
+    // TODO: There is some weird flashing when switching to a second game...
+    if (this.bigScore) {
+        this.removeChild(this.bigScore);
+        this.bigScore = null;
+    }
+};
+
 function GameLayer() {
     Layer.apply(this);
+    this.done = false;
     this.board = this.addEntity(new Board());
     this.display = this.addEntity(new Display(this.board));
     this.board.reset();
@@ -385,6 +403,11 @@ function GameLayer() {
     var display = this.display;
     this.board.lost.addListener(function () {
         display.emphasizeScore();
+    });
+
+    var gameLayer = this;
+    this.board.completed.addListener(function () {
+        gameLayer.done = true;
     });
 
     var board = this.board;
@@ -403,6 +426,13 @@ function GameLayer() {
 
         down: function (pressed) {
             board.player.setMovingDownState(pressed);
+        },
+
+        enter: function (pressed) {
+            // TODO: Really, any key should be able to quit, but this will require modifying the event handling...
+            if (pressed && gameLayer.done) {
+                gameLayer.endGame();
+            }
         }
     };
 
@@ -427,6 +457,17 @@ GameLayer.prototype = Object.create(Layer.prototype);
 GameLayer.prototype.reset = function () {
     this.done = false;
     this.board.reset();
+    this.display.reset();
+};
+
+GameLayer.prototype.start = function () {
+    Radius.pushLayer(this);
+};
+
+GameLayer.prototype.endGame = function () {
+    this.reset();
+    this.done = true;
+    Radius.popLayer();
 };
 
 function MainMenu() {
@@ -443,7 +484,7 @@ MainMenu.prototype = Object.create(FormLayer.prototype);
 MainMenu.prototype.startNewGame = function () {
     // TODO: Instructions, difficulty
     this.gameLayer.reset();
-    Radius.pushLayer(this.gameLayer);
+    this.gameLayer.start();
 };
 
 window.onload = function () {
