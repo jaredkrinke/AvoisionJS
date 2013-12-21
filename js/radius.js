@@ -103,7 +103,6 @@ var keyCodeToName = {
 // Layer that contains entities to display/update
 function Layer() {
     this.entities = [];
-    this.keyPressed = {};
 }
 
 Layer.prototype = {
@@ -135,6 +134,15 @@ Layer.prototype = {
         }
 
         this.lastUpdate = now;
+    },
+
+    keyPressed: function (key, pressed) {
+        if (this.keyPressedHandlers) {
+            var keyPressedHandler = this.keyPressedHandlers[key];
+            if (keyPressedHandler) {
+                keyPressedHandler.call(this, pressed);
+            }
+        }
     },
 
     drawEntity: function (canvas, context, entity) {
@@ -551,12 +559,8 @@ var Radius = new function () {
         // TODO: Handle switching layers
         if (activeLayer) {
             // Handle input
-            var keyPressed = activeLayer.keyPressed;
             keySerializer.process(function (key, pressed) {
-                var keyPressedHandler = keyPressed[key];
-                if (keyPressedHandler) {
-                    keyPressedHandler.call(activeLayer, pressed);
-                }
+                activeLayer.keyPressed(key, pressed);
             });
 
             var mouseButtonPressed = activeLayer.mouseButtonPressed;

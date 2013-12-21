@@ -127,6 +127,12 @@ function Form(x, y, desiredWidth, desiredHeight, layout, components) {
     } else {
         this.components = [];
     }
+
+    this.keyPressedHandlers = {
+        up: Form.prototype.moveFocusUp,
+        down: Form.prototype.moveFocusDown,
+        enter: Form.prototype.activate
+    };
 }
 
 Form.defaultX = -200;
@@ -136,7 +142,7 @@ Form.defaultWidth = 400;
 Form.prototype = {
     constructor: Form,
 
-    changeFocus: function (newlyFocusedNode, event) {
+    changeFocus: function (newlyFocusedNode, key) {
         var lastFocusedNode = this.focusedNode;
         this.focusedNode = newlyFocusedNode;
 
@@ -147,7 +153,7 @@ Form.prototype = {
 
         // Notify the newly-focused component that it has gained focus
         if (newlyFocusedNode && newlyFocusedNode.focused) {
-            newlyFocusedNode.focused(event);
+            newlyFocusedNode.focused(key);
         }
     },
 
@@ -165,7 +171,7 @@ Form.prototype = {
         }
     },
 
-    moveFocusUp: function (event) {
+    moveFocusUp: function (key) {
         var oldNode = this.focusedNode;
         var newNode;
         var i;
@@ -173,7 +179,7 @@ Form.prototype = {
         if (oldNode) {
             i = this.getComponentIndex(oldNode);
         } else {
-            // Start with the last component
+            // Start after the last component
             i = this.components.length;
         }
 
@@ -187,13 +193,13 @@ Form.prototype = {
         }
 
         if (newNode) {
-            this.changeFocus(newNode, event);
+            this.changeFocus(newNode, key);
         }
 
         return newNode && newNode !== oldNode;
     },
 
-    moveFocusDown: function (event) {
+    moveFocusDown: function (key) {
         var components = this.components;
         var oldNode = this.focusedNode;
         var newNode;
@@ -217,7 +223,7 @@ Form.prototype = {
         }
 
         if (newNode) {
-            this.changeFocus(newNode, event);
+            this.changeFocus(newNode, key);
         }
 
         return newNode && newNode !== oldNode;
@@ -230,6 +236,26 @@ Form.prototype = {
         if (this.focusedNode && this.focusedNode.activated) {
             this.focusedNode.activated();
             handled = true;
+        }
+
+        return handled;
+    },
+
+    keyPressed: function (key, pressed) {
+        var handled = false;
+
+        // Give priority to the focused component
+        if (this.focusedNode && this.focusedNode.keyPressed) {
+            handled = this.focusedNode.keyPressed(key, pressed);
+        }
+
+        if (!handled) {
+            var keyPressedHandler = this.keyPressedHandlers[key];
+            if (keyPressedHandler) {
+                if (pressed) {
+                    handled = keyPressedHandler.call(this, key, pressed);
+                }
+            }
         }
 
         return handled;
@@ -302,9 +328,16 @@ Form.prototype = {
         }
     },
 
-    focused: function (event) {
-        // TODO: There is special logic for when an event is supplied...?
-        this.moveFocusDown();
+    focused: function (key) {
+        // If an entry key was supplied use that instead
+        if (key) {
+            var handler = this.keyPressedHandlers[key];
+            if (handler) {
+                handler.call(this);
+            }
+        } else {
+            this.moveFocusDown();
+        }
     },
 
     unfocused: function () {
@@ -453,25 +486,6 @@ function FormLayer(form) {
     this.form = form;
     form.setLayer(this);
     form.focused();
-    this.keyPressed = {
-        up: function (pressed) {
-            if (pressed) {
-                this.form.moveFocusUp();
-            }
-        },
-
-        down: function (pressed) {
-            if (pressed) {
-                this.form.moveFocusDown();
-            }
-        },
-
-        enter: function (pressed) {
-            if (pressed) {
-                this.form.activate();
-            }
-        }
-    };
 }
 
 FormLayer.prototype = Object.create(Layer.prototype);
@@ -482,4 +496,9 @@ FormLayer.prototype.show = function () {
 
 FormLayer.prototype.shown = function () {
     // TODO: Update selected item based on mouse
+};
+
+FormLayer.prototype.keyPressed = function (key, pressed) {
+    // TODO: Hard-code cancellation?
+    this.form.keyPressed(key, pressed);
 };
