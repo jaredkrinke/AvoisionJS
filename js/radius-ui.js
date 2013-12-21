@@ -70,11 +70,15 @@ Button.prototype.unfocused = function () {
 
 function Form(x, y, desiredWidth, desiredHeight) {
     this.components = [];
-    this.x = x;
-    this.y = y;
-    this.desiredWidth = desiredWidth;
+    this.x = (x !== undefined) ? x : Form.defaultX;
+    this.y = (y !== undefined) ? y : Form.defaultY;
+    this.desiredWidth = desiredWidth || Form.defaultWidth;
     this.desiredHeight = desiredHeight;
 }
+
+Form.defaultX = -200;
+Form.defaultY = 200;
+Form.defaultWidth = 400;
 
 Form.prototype = {
     constructor: Form,
