@@ -2,8 +2,8 @@
 
 function Label(text, alignment, textHeight, font) {
     Entity.apply(this);
-    this.elements = [this.textElement = new Text(text, font || Label.font)];
     this.alignment = alignment || 'left';
+    this.elements = [this.textElement = new Text(text, font || Label.font, undefined, undefined, this.alignment)];
     this.totalHeight = textHeight || Label.textHeight;
     var size = this.getMinimumSize();
     this.totalWidth = size[0];
@@ -18,13 +18,11 @@ Label.alignmentToSetX = {
     },
 
     center: function (x) {
-        // TODO: This sets it to the very middle, but text alignment works differently here
         var size = this.getSize();
         this.x = x + size[0] / 2;
     },
 
     right: function (x) {
-        // TODO: Text element alignment works differently here as well
         var size = this.getSize();
         this.x = x + size[0];
     }
