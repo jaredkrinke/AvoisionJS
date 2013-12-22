@@ -3,10 +3,9 @@
 function Label(text, alignment, textHeight, font) {
     Entity.apply(this);
     this.alignment = alignment || 'left';
-    this.elements = [this.textElement = new Text(text, font || Label.font, undefined, undefined, this.alignment)];
+    this.elements = [this.textElement = new Text('', font || Label.font, undefined, undefined, this.alignment)];
     this.totalHeight = textHeight || Label.textHeight;
-    var size = this.getMinimumSize();
-    this.totalWidth = size[0];
+    this.setText(text);
 }
 
 Label.textHeight = 24;
@@ -26,6 +25,15 @@ Label.alignmentToSetX = {
         var size = this.getSize();
         this.x = x + size[0];
     }
+};
+
+Label.prototype.setColor = function (color) {
+    this.textElement.color = color;
+};
+
+Label.prototype.setText = function (text) {
+    this.textElement.text = text;
+    this.totalWidth = this.getMinimumSize()[0];
 };
 
 Label.prototype.setLayer = function (layer) {
@@ -99,7 +107,7 @@ Button.prototype = Object.create(Label.prototype);
 
 Button.prototype.setActive = function (active) {
     this.active = active;
-    this.textElement.color = (active ? Button.defaultColor : Button.disabledColor);
+    this.setColor(active ? Button.defaultColor : Button.disabledColor);
 };
 
 Button.prototype.getActive = function () {
@@ -131,6 +139,8 @@ function Form(x, y, desiredWidth, desiredHeight, layout, components) {
     this.keyPressedHandlers = {
         up: Form.prototype.moveFocusUp,
         down: Form.prototype.moveFocusDown,
+        left: Form.prototype.moveLeft,
+        right: Form.prototype.moveRight,
         enter: Form.prototype.activate
     };
 }
@@ -229,7 +239,23 @@ Form.prototype = {
         return newNode && newNode !== oldNode;
     },
 
-    // TODO: moveLeft/moveRight
+    moveLeft: function () {
+        var handled = false;
+        if (this.focusedNode && this.focusedNode.movedLeft) {
+            this.focusedNode.movedLeft();
+        }
+
+        return handled;
+    },
+
+    moveRight: function () {
+        var handled = false;
+        if (this.focusedNode && this.focusedNode.movedRight) {
+            this.focusedNode.movedRight();
+        }
+
+        return handled;
+    },
 
     activate: function () {
         var handled = false;
@@ -347,18 +373,19 @@ Form.prototype = {
     // TODO: Nested focus/unfocus
 };
 
-var columnLayout = function (pad) {
-    var columns = this.columns || 1;
+var columnLayout = function (columns, pad, columnWidths) {
+    // Determine minimum column widths and row heights
+    var fixed = !!columnWidths;
 
-    // Determine minimum column widths
-    var columnWidths = [];
-    var rowMinimumWidths = [0];
     var rowHeights = [0];
     var column;
     var row = 0;
 
-    for (column = 0; column < columns; column++) {
-        columnWidths[column] = 0;
+    if (!fixed) {
+        columnWidths = [];
+        for (column = 0; column < columns; column++) {
+            columnWidths[column] = 0;
+        }
     }
 
     var components = this.components;
@@ -367,14 +394,16 @@ var columnLayout = function (pad) {
     for (column = 0, i = 0; i < componentCount; i++) {
         var component = components[i];
         var minimumSize = component.getMinimumSize();
-        columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
-        rowMinimumWidths[row] += minimumSize[0];
         rowHeights[row] = Math.max(rowHeights[row], minimumSize[1]);
+
+        if (!fixed) {
+            columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
+        }
+
         column = (column + 1) % columns;
 
         if (column === 0) {
             row++;
-            rowMinimumWidths[row] = 0;
             rowHeights[row] = 0;
         }
     }
@@ -388,7 +417,7 @@ var columnLayout = function (pad) {
     this.minimumWidth = minimumWidth;
 
     // Check for size constraints
-    if (this.desiredWidth) {
+    if (!fixed && this.desiredWidth) {
         // Add padding (or negative padding)
         var padding = (this.desiredWidth - minimumWidth) / columns;
         if (!pad && padding > 0) {
@@ -428,7 +457,7 @@ var columnLayout = function (pad) {
         var component = components[i];
 
         // Flow layout doesn't fill the entire column
-        if (!pad) {
+        if (!pad && !fixed) {
             var minimumSize = component.getMinimumSize();
             componentWidth = minimumSize[0];
         }
@@ -452,7 +481,7 @@ function FlowForm(columns, x, y, desiredWidth, desiredHeight, components) {
 }
 
 FlowForm.layout = function () {
-    columnLayout.call(this, false);
+    columnLayout.call(this, this.columns, false);
 };
 
 FlowForm.prototype = Object.create(Form.prototype);
@@ -470,7 +499,7 @@ function GridForm(columns, x, y, desiredWidth, desiredHeight, components) {
 }
 
 GridForm.layout = function () {
-    columnLayout.call(this, true);
+    columnLayout.call(this, this.columns, true);
 };
 
 GridForm.prototype = Object.create(Form.prototype);
@@ -480,6 +509,89 @@ function NestedGridForm(columns, components) {
 }
 
 NestedGridForm.prototype = Object.create(GridForm.prototype);
+
+// Fixed-width forms
+function FixedForm(columnWidths, x, y, desiredWidth, desiredHeight, components) {
+    this.columnWidths = columnWidths;
+    Form.call(this, x, y, desiredWidth, desiredHeight, FixedForm.layout, components);
+}
+
+FixedForm.layout = function () {
+    columnLayout.call(this, this.columnWidths.length, false, this.columnWidths);
+};
+
+FixedForm.prototype = Object.create(Form.prototype);
+
+function NestedFixedForm(columnWidths, components) {
+    FixedForm.call(this, columnWidths, undefined, undefined, undefined, undefined, components);
+}
+
+NestedFixedForm.prototype = Object.create(FixedForm.prototype);
+
+function Choice(text, choices, choiceChanged) {
+    var label = new Button(text + ': ');
+    var leftArrow = new Label('< ');
+    leftArrow.setColor(Button.disabledColor);
+    var rightArrow = new Label(' >');
+    rightArrow.setColor(Button.disabledColor);
+    var itemComponent = new Label('', 'center');
+
+    // Size item area according to largest item
+    var maxItemWidth = 0;
+    for (var i = 0; i < choices.length; i++) {
+        itemComponent.setText(choices[i]);
+        maxItemWidth = Math.max(maxItemWidth, itemComponent.getMinimumSize()[0]);
+    }
+
+    NestedFixedForm.call(this, [label.getMinimumSize()[0], leftArrow.getMinimumSize()[0], maxItemWidth, rightArrow.getMinimumSize()[0]], [label, leftArrow, itemComponent, rightArrow]);
+
+    this.choices = choices;
+    this.leftArrow = leftArrow;
+    this.itemComponent = itemComponent;
+    this.rightArrow = rightArrow;
+    this.choiceChanged = choiceChanged;
+    this.choice = choices[0];
+    // TODO: Colors
+
+    this.setIndex(0);
+}
+
+Choice.prototype = Object.create(NestedFixedForm.prototype);
+
+Choice.prototype.setIndex = function (index) {
+    this.index = index;
+    this.choice = this.choices[index];
+
+    // Update UI
+    this.itemComponent.setText(this.choices[index]);
+    this.leftArrow.opacity = (index === 0 ? 0 : 1);
+    this.rightArrow.opacity = (index === this.choices.length - 1 ? 0 : 1);
+
+    // Notify
+    if (this.choiceChanged) {
+        this.choiceChanged(this.choice);
+    }
+};
+
+// TODO: select, getChoice
+
+Choice.prototype.movedLeft = function () {
+    if (this.index > 0) {
+        this.setIndex(this.index - 1);
+    }
+
+    return true;
+};
+
+Choice.prototype.movedRight = function () {
+    if (this.index < this.choices.length - 1) {
+        this.setIndex(this.index + 1);
+    }
+
+    return true;
+};
+
+// TODO: activated, routePosition, highlights, set/getActive, mouseMoved, focused/unfocused
 
 function FormLayer(form) {
     Layer.apply(this);
