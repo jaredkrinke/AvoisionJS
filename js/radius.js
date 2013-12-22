@@ -146,68 +146,74 @@ Layer.prototype = {
     },
 
     drawEntity: function (canvas, context, entity) {
-        context.save();
-        context.translate(entity.x, entity.y);
+        var opacity = (entity.opacity !== undefined ? entity.opacity : 1);
+        if (opacity > 0) {
+            context.save();
+            context.translate(entity.x, entity.y);
 
-        if (entity.width !== 1 || entity.height !== 1) {
-            context.scale(entity.width, entity.height);
-        }
+            if (entity.width !== 1 || entity.height !== 1) {
+                context.scale(entity.width, entity.height);
+            }
 
-        if (entity.angle) {
-            context.rotate(entity.angle);
-        }
+            if (entity.angle) {
+                context.rotate(entity.angle);
+            }
 
-        if (entity.color) {
-            context.fillStyle = entity.color;
-        }
+            if (entity.color) {
+                context.fillStyle = entity.color;
+            }
 
-        if (entity.opacity !== undefined) {
-            context.globalAlpha *= entity.opacity;
-        }
+            if (opacity < 1) {
+                context.globalAlpha *= opacity;
+            }
 
-        // Draw all elements
-        if (entity.elements) {
-            var elementCount = entity.elements.length;
-            for (var i = 0; i < elementCount; i++) {
-                var element = entity.elements[i];
-                context.save();
+            // Draw all elements
+            if (entity.elements) {
+                var elementCount = entity.elements.length;
+                for (var i = 0; i < elementCount; i++) {
+                    var element = entity.elements[i];
+                    var elementOpacity = (element.opacity !== undefined ? element.opacity : 1);
+                    if (elementOpacity > 0) {
+                        context.save();
 
-                // Need to flip the coordinate system back so that text is rendered upright
-                context.scale(1, -1);
+                        // Need to flip the coordinate system back so that text is rendered upright
+                        context.scale(1, -1);
 
-                if (element.color) {
-                    context.fillStyle = element.color;
-                }
+                        if (element.color) {
+                            context.fillStyle = element.color;
+                        }
 
-                if (element.opacity !== undefined) {
-                    context.globalAlpha *= element.opacity;
-                }
+                        if (elementOpacity < 1) {
+                            context.globalAlpha *= elementOpacity;
+                        }
 
-                if (element instanceof Rectangle) {
-                    context.fillRect(element.x, -element.y, element.width, element.height);
-                } else if (element instanceof Text && element.text) {
-                    if (element.font) {
-                        context.font = element.font;
+                        if (element instanceof Rectangle) {
+                            context.fillRect(element.x, -element.y, element.width, element.height);
+                        } else if (element instanceof Text && element.text) {
+                            if (element.font) {
+                                context.font = element.font;
+                            }
+
+                            context.textBaseline = element.baseline;
+                            context.textAlign = element.align;
+                            context.fillText(element.text, element.x, -element.y);
+                        }
+
+                        context.restore();
                     }
-
-                    context.textBaseline = element.baseline;
-                    context.textAlign = element.align;
-                    context.fillText(element.text, element.x, -element.y);
                 }
-
-                context.restore();
             }
-        }
 
-        // Draw children
-        if (entity.children) {
-            var childCount = entity.children.length;
-            for (var i = 0; i < childCount; i++) {
-                Layer.prototype.drawEntity(canvas, context, entity.children[i]);
+            // Draw children
+            if (entity.children) {
+                var childCount = entity.children.length;
+                for (var i = 0; i < childCount; i++) {
+                    Layer.prototype.drawEntity(canvas, context, entity.children[i]);
+                }
             }
-        }
 
-        context.restore();
+            context.restore();
+        }
     },
 
     draw: function (canvas, context) {
