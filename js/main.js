@@ -259,18 +259,37 @@ Board.prototype.getSafePosition = function (width, height) {
 };
 
 Board.prototype.addEnemy = function () {
-    var size = 1 / 30;
-    var speed = 0.2 / 1000;
+    var size = Board.enemyWidth;
+    var speed = Board.enemySpeed;
     var speedX = 0;
     var speedY = 0;
     var position = this.getSafePosition(size, size);
 
-    // TODO: Difficulty levels
+    // Enemy speeds vary on normal
+    if (this.difficulty >= Difficulty.nameToLevel.Normal) {
+        speed = Board.enemySpeedMin + (Board.enemySpeedMax - Board.enemySpeedMin) * Math.random();
+    }
+
+    // Enemies are faster and their sizes vary on hard
+    if (this.difficulty >= Difficulty.nameToLevel.Hard) {
+        speed *= 1.1;
+        size = Board.enemyWidthMin + (Board.enemyWidthMax - Board.enemyWidthMin) * Math.random();
+    }
 
     if (Math.random() >= 0.5) {
         speedX = speed;
     } else {
         speedY = speed;
+    }
+
+    // Enemies can move diagonally on hard
+    if (this.difficulty >= Difficulty.nameToLevel.Hard && Math.random() > 0.5) {
+        var otherSpeed = Board.enemySpeedMin + (Board.enemySpeedMax - Board.enemySpeedMin) * Math.random();
+        if (speedX === 0) {
+            speedX = otherSpeed;
+        } else {
+            speedY = otherSpeed;
+        }
     }
 
     // Animate in the new enemy
