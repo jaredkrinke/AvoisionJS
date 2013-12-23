@@ -259,11 +259,11 @@ Text.prototype = {
 }
 
 // Entity that can be displayed and updated each frame
-function Entity() {
-    this.x = 0;
-    this.y = 0;
-    this.width = 1;
-    this.height = 1;
+function Entity(x, y, width, height) {
+    this.x = (x !== undefined ? x : 0);
+    this.y = (y !== undefined ? y : 0);
+    this.width = width || 1;
+    this.height = height || 1;
     this.angle = 0;
     this.color = 'white';
 }

@@ -93,6 +93,7 @@ Title.textHeight = 32;
 Title.font = Title.textHeight + 'px sans-serif';
 Title.prototype = Object.create(Label.prototype);
 
+// TODO: Be consistent about passing callbacks to constructors and using Events (better, use both)
 function Button(text, activated) {
     Label.call(this, text);
     this.active = true;

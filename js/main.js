@@ -1,42 +1,44 @@
 ﻿/// <reference path="radius.js" />
 /// <reference path="radius-ui.js" />
 
-function Enemy(x, y, width, height, speedX, speedY) {
-    Entity.call(this);
-    this.x = x;
-    this.y = y;
-    this.width = width;
-    this.height = height;
-    this.speed = {
-        x: speedX,
-        y: speedY
-    };
+function MovingObject(x, y, width, height, vx, vy) {
+    Entity.call(this, x, y, width, height);
     this.elements = [new Rectangle()];
+    this.v = {
+        x: vx,
+        y: vy
+    };
 }
 
-Enemy.prototype = Object.create(Entity.prototype);
+MovingObject.prototype = Object.create(Entity.prototype);
 
-Enemy.prototype.updateAxis = function (ms, axis, axisSize) {
-    var axisSpeed = this.speed[axis];
-    var axisPosition = this[axis] + axisSpeed * ms;
+MovingObject.prototype.updateAxis = function (ms, axis, axisSize) {
+    var v = this.v[axis];
+    var axisPosition = this[axis] + v * ms;
     if (Math.abs(axisPosition) + axisSize / 2 > 0.5) {
         // Reverse direction
-        if (axisSpeed > 0) {
+        if (v > 0) {
             axisPosition = 0.5 - axisSize / 2 - 0.01;
         } else {
             axisPosition = -0.5 + axisSize / 2 + 0.01;
         }
-        
-        this.speed[axis] = -axisSpeed;
+
+        this.v[axis] = -v;
     }
-    
+
     this[axis] = axisPosition;
 };
 
-Enemy.prototype.update = function (ms) {
+MovingObject.prototype.update = function (ms) {
     this.updateAxis(ms, 'x', this.width);
     this.updateAxis(ms, 'y', this.height);
 };
+
+function Enemy(x, y, width, height, vx, vy) {
+    MovingObject.call(this, x, y, width, height, vx, vy);
+}
+
+Enemy.prototype = Object.create(MovingObject.prototype);
 
 function Goal() {
     Entity.call(this);
@@ -153,23 +155,32 @@ function Board() {
     this.width = 400;
     this.height = 400;
     this.color = 'blue';
+    this.elements = [new Rectangle()];
+
+    this.paused = false;
     this.difficulty = Difficulty.nameToLevel.Easy;
+    this.score = 0;
     this.player = new Player();
     this.goal = new Goal();
-    this.paused = false;
-    this.score = 0;
     this.scoreUpdated = new Event();
     this.points = 0;
     this.pointsUpdated = new Event();
     this.points = 30;
     this.lost = new Event();
     this.completed = new Event();
-    this.elements = [new Rectangle()];
 }
 
 Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 Board.timeout = 19000;
 Board.transitionPeriod = 1000;
+Board.enemyWidth = 1 / 30;
+Board.enemyWidthMin = 1 / 90;
+Board.enemyWidthMax = 1 / 15;
+Board.enemySpeed = 0.2 / 1000;
+Board.enemySpeedMin = 0.1 / 1000;
+Board.enemySpeedMax = 0.6 / 1000;
+Board.goalSpeed = 0.1 / 1000;
+Board.goalDirectionPeriod = 3000;
 
 Board.prototype = Object.create(Entity.prototype);
 
