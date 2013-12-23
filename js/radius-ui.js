@@ -196,6 +196,7 @@ Form.prototype = {
         // Iterate to next active node
         while (--i >= 0) {
             var component = this.components[i];
+            // TODO: The first two conditions seem unnecessary... this is done in two places in this file
             if (component && component.getActive && component.getActive()) {
                 newNode = component;
                 break;
@@ -287,7 +288,52 @@ Form.prototype = {
         return handled;
     },
 
-    // TODO: keyPressed, mouseMoved, inputReceived, layout, addAtLocation
+    getComponentAtPosition: function (x, y) {
+        var intersectingComponent;
+        var componentCount = this.components.length;
+        for (var i = 0; i < componentCount; i++) {
+            var component = this.components[i];
+            if (component.getActive && component.getActive()) {
+                var position = component.getPosition();
+                var size = component.getSize();
+                var x2 = position[0] + size[0];
+                var y2 = position[1] - size[1];
+
+                if (x >= position[0] && x <= x2 && y <= position[1] && y >= y2) {
+                    // Only focus/notify the first match
+                    intersectingComponent = component;
+                    break;
+                }
+            }
+        }
+
+        return intersectingComponent;
+    },
+
+    mouseMoved: function (x, y) {
+        var handled = false;
+        var component = this.getComponentAtPosition(x, y);
+        if (component) {
+            if (this.focusedNode !== component) {
+                this.changeFocus(component);
+            }
+
+            if (component.mouseMoved) {
+                handled = component.mouseMoved(x, y);
+            }
+        }
+
+        return handled;
+    },
+
+    mouseButtonPressed: function (button, pressed, x, y) {
+        // TODO: This is kind of a hack...
+        // Move first
+        this.mouseMoved(x, y);
+
+        // Now handle the press as though enter were pressed...
+        return this.keyPressed('enter', pressed);
+    },
 
     add: function (component) {
         this.components.push(component);
@@ -613,4 +659,12 @@ FormLayer.prototype.shown = function () {
 FormLayer.prototype.keyPressed = function (key, pressed) {
     // TODO: Hard-code cancellation?
     this.form.keyPressed(key, pressed);
+};
+
+FormLayer.prototype.mouseMoved = function (x, y) {
+    return this.form.mouseMoved(x, y);
+};
+
+FormLayer.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    return this.form.mouseButtonPressed(button, pressed, x, y);
 };

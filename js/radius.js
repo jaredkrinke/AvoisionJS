@@ -585,7 +585,7 @@ var Radius = new function () {
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
                     var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
-                    mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
+                    activeLayer.mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
                 }
             }, function (globalX, globalY) {
                 if (mouseMoved) {
@@ -594,7 +594,7 @@ var Radius = new function () {
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
                     var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
-                    mouseMoved(localCoordinates[0], localCoordinates[1]);
+                    activeLayer.mouseMoved(localCoordinates[0], localCoordinates[1]);
                 }
             });
 
