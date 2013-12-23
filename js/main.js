@@ -316,7 +316,7 @@ Board.prototype.update = function (ms) {
                 this.resetGoalDirection();
             }
 
-            var points = Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
+            var points = (this.difficulty + 1) * Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
             if (points !== this.points) {
                 this.setPoints(points);
             }
