@@ -41,14 +41,11 @@ function Enemy(x, y, width, height, vx, vy) {
 Enemy.prototype = Object.create(MovingObject.prototype);
 
 function Goal() {
-    Entity.call(this);
-    this.width = 1 / 30;
-    this.height = 1 / 30;
+    MovingObject.call(this, 0 ,0, Board.enemyWidth, Board.enemyWidth, 0, 0);
     this.color = 'red';
-    this.elements = [new Rectangle()];
 }
 
-Goal.prototype = Object.create(Entity.prototype);
+Goal.prototype = Object.create(MovingObject.prototype);
 
 Goal.prototype.createGhost = function () {
     return new Ghost(this, 500, 5);
@@ -189,8 +186,32 @@ Board.prototype.resetGoal = function () {
     var position = this.getSafePosition(this.goal.width, this.goal.height);
     this.goal.x = position[0];
     this.goal.y = position[1];
-    this.setPoints(Board.pointProgression[0]);
+    this.setPoints(Board.pointProgression[0] * (this.difficulty + 1));
     this.timer = 0;
+
+    // The goal moves on hard
+    this.goal.va = (this.difficulty >= Difficulty.nameToLevel.Hard ? Board.goalSpeed : 0);
+    this.resetGoalDirection();
+};
+
+Board.prototype.resetGoalDirection = function () {
+    var v = this.goal.va;
+
+    // Direction
+    if (Math.random() > 0.5) {
+        v = -v;
+    }
+
+    // Axis
+    if (Math.random() > 0.5) {
+        this.goal.v.x = v;
+        this.goal.v.y = 0;
+    } else {
+        this.goal.v.x = 0;
+        this.goal.v.y = v;
+    }
+
+    this.goalDirectionTimer = this.timer + Board.goalDirectionPeriod * Math.random();
 };
 
 Board.prototype.checkCollision = function (a, b) {
@@ -290,6 +311,11 @@ Board.prototype.update = function (ms) {
         if (this.checkCollision(this.player, this.goal)) {
             this.captureGoal();
         } else {
+            // Update goal direction
+            if (this.difficulty >= Difficulty.nameToLevel.Hard && this.timer >= this.goalDirectionTimer) {
+                this.resetGoalDirection();
+            }
+
             var points = Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
             if (points !== this.points) {
                 this.setPoints(points);
