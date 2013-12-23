@@ -153,6 +153,7 @@ function Board() {
     this.width = 400;
     this.height = 400;
     this.color = 'blue';
+    this.difficulty = Difficulty.nameToLevel.Easy;
     this.player = new Player();
     this.goal = new Goal();
     this.paused = false;
@@ -324,6 +325,10 @@ Board.prototype.reset = function () {
     this.resetGoal();
 };
 
+Board.prototype.setDifficulty = function (difficulty) {
+    this.difficulty = difficulty;
+};
+
 function ValueDisplay(font, event, x, y, align, updatedCallback) {
     Entity.apply(this);
     this.x = x;
@@ -411,7 +416,7 @@ function GameLayer() {
     });
 
     var board = this.board;
-    this.keyPressed = {
+    this.keyPressedHandlers = {
         left: function (pressed) {
             board.player.setMovingLeftState(pressed);
         },
@@ -436,11 +441,16 @@ function GameLayer() {
         }
     };
 
+    // TODO: Why aren't these in the prototype instead?
     this.mouseButtonPressed = function (button, pressed, x, y) {
         if (button == MouseButton.primary) {
             if (pressed) {
                 // TODO: This is ugly
-                board.player.setTarget(x / board.width, y / board.height);
+                if (gameLayer.done) {
+                    gameLayer.endGame();
+                } else {
+                    board.player.setTarget(x / board.width, y / board.height);
+                }
             } else {
                 board.player.clearTarget();
             }
@@ -460,6 +470,10 @@ GameLayer.prototype.reset = function () {
     this.display.reset();
 };
 
+GameLayer.prototype.setDifficulty = function (difficulty) {
+    this.board.setDifficulty(difficulty);
+};
+
 GameLayer.prototype.start = function () {
     Radius.pushLayer(this);
 };
@@ -470,23 +484,40 @@ GameLayer.prototype.endGame = function () {
     Radius.popLayer();
 };
 
+Difficulty = {
+    levelToName: ['Easy', 'Normal', 'Hard'],
+    nameToLevel: {
+        Easy: 0,
+        Normal: 1,
+        Hard: 2
+    }
+};
+
 function MainMenu() {
     this.gameLayer = new GameLayer();
 
+    var difficultyChoice = new Choice('Difficulty', Difficulty.levelToName);
     var mainMenu = this;
+    difficultyChoice.choiceChanged.addListener(function (difficultyName) {
+        mainMenu.difficulty = Difficulty.nameToLevel[difficultyName];
+    });
+
     FormLayer.call(this, new NestedFlowForm(1, [
         new Title('Avoision'),
         new Separator(),
         new Button('Start New Game', function () { mainMenu.startNewGame(); }),
-        new Title('Avoision'),
-        new Title('Avoision')
+        difficultyChoice
     ]));
 }
 
 MainMenu.prototype = Object.create(FormLayer.prototype);
 
 MainMenu.prototype.startNewGame = function () {
-    // TODO: Instructions, difficulty
+    // TODO: Instructions
+    if (this.difficulty) {
+        this.gameLayer.setDifficulty(this.difficulty);
+    }
+
     this.gameLayer.reset();
     this.gameLayer.start();
 };

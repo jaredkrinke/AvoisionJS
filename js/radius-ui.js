@@ -574,7 +574,7 @@ function NestedFixedForm(columnWidths, components) {
 
 NestedFixedForm.prototype = Object.create(FixedForm.prototype);
 
-function Choice(text, choices, choiceChanged) {
+function Choice(text, choices) {
     var label = new Button(text + ': ');
     var leftArrow = new Label('< ');
     leftArrow.setColor(Button.disabledColor);
@@ -595,7 +595,7 @@ function Choice(text, choices, choiceChanged) {
     this.leftArrow = leftArrow;
     this.itemComponent = itemComponent;
     this.rightArrow = rightArrow;
-    this.choiceChanged = choiceChanged;
+    this.choiceChanged = new Event();
     this.choice = choices[0];
     // TODO: Colors
 
@@ -614,9 +614,7 @@ Choice.prototype.setIndex = function (index) {
     this.rightArrow.opacity = (index === this.choices.length - 1 ? 0 : 1);
 
     // Notify
-    if (this.choiceChanged) {
-        this.choiceChanged(this.choice);
-    }
+    this.choiceChanged.fire(this.choice);
 };
 
 // TODO: select, getChoice
