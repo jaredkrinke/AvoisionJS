@@ -234,11 +234,12 @@ Layer.prototype = {
     }
 };
 
-function Rectangle(x, y, width, height) {
+function Rectangle(x, y, width, height, color) {
     this.x = (x !== undefined ? x : -0.5);
     this.y = (y !== undefined ? y : 0.5);
     this.width = width || 1;
     this.height = height || 1;
+    this.color = color;
 }
 
 function Text(text, font, x, y, align, baseline) {

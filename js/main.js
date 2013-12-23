@@ -549,6 +549,82 @@ Difficulty = {
     }
 };
 
+function Logo() {
+    Entity.call(this);
+    this.desiredWidth = 1;
+    this.desiredHeight = 1;
+
+    // Animation
+    var chaseX = 0.2;
+    var chaseY = -0.2;
+    var chaseX2 = 0.8;
+    var chaseY2 = -0.8;
+    var chaseSize = 0.25;
+    var chasePeriod = 3000;
+
+    var background = new Entity(0.5, -0.5, 0.95, 0.95);
+    background.elements = [new Rectangle()];
+    background.color = 'blue';
+    this.children = [
+        background,
+        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'green')], [
+            [0, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+        ], true),
+        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'red')], [
+            [0, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+        ], true),
+        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'white')], [
+            [0, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+        ], true),
+    ];
+}
+
+Logo.prototype = Object.create(Entity.prototype);
+
+Logo.prototype.setLayer = function (layer) {
+    layer.addEntity(this);
+};
+
+Logo.prototype.getPosition = function () {
+    return [this.x, this.y];
+};
+
+Logo.prototype.setPosition = function (x, y) {
+    this.x = x;
+    this.y = y;
+};
+
+Logo.prototype.getActive = function () {
+    return false;
+}
+
+Logo.prototype.getMinimumSize = function () {
+    return [this.desiredWidth, this.desiredHeight];
+}
+
+Logo.prototype.getDesiredSize = Logo.prototype.getMinimumSize;
+Logo.prototype.getSize = Logo.prototype.getMinimumSize;
+
+Logo.prototype.setSize = function (width, height) {
+    // Maintain aspect ratio
+    this.desiredWidth = Math.max(width, height);
+    this.desiredHeight = this.desiredWidth;
+    this.width = this.desiredWidth;
+    this.height = this.desiredHeight;
+};
+
 function MainMenu() {
     this.gameLayer = new GameLayer();
 
@@ -559,7 +635,11 @@ function MainMenu() {
     });
 
     FormLayer.call(this, new NestedFlowForm(1, [
-        new Title('Avoision'),
+        new NestedFlowForm(3, [
+            new Title('Avoision'),
+            new Label('  '),
+            new Logo()
+            ]),
         new Separator(),
         new Button('Start New Game', function () { mainMenu.startNewGame(); }),
         difficultyChoice

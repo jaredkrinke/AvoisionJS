@@ -89,7 +89,7 @@ function Title(text) {
     Label.call(this, text, 'center', Title.textHeight, Title.font);
 }
 
-Title.textHeight = 32;
+Title.textHeight = 48;
 Title.font = Title.textHeight + 'px sans-serif';
 Title.prototype = Object.create(Label.prototype);
 
