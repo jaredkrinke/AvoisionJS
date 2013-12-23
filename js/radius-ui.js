@@ -637,7 +637,15 @@ Choice.prototype.movedRight = function () {
     return true;
 };
 
-// TODO: activated, routePosition, highlights, set/getActive, mouseMoved, focused/unfocused
+Choice.prototype.activated = function () {
+    // TODO: Special case for mouse input somehow
+    var newIndex = (this.index + 1) % this.choices.length;
+    if (newIndex !== this.index) {
+        this.setIndex(newIndex);
+    }
+};
+
+// TODO: routePosition, highlights, set/getActive, mouseMoved, focused/unfocused
 
 function FormLayer(form) {
     Layer.apply(this);
