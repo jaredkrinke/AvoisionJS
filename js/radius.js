@@ -534,6 +534,11 @@ var Radius = new function () {
     var context;
 
     this.pushLayer = function (layer) {
+        // Mark the current top layer as being hidden
+        if (list[0]) {
+            list[0].hidden = true;
+        }
+
         list.unshift(layer);
 
         // Run the "shown" handler, if it exists
@@ -543,6 +548,11 @@ var Radius = new function () {
     };
 
     this.popLayer = function () {
+        // Mark the current top layer as being hidden
+        if (list[0]) {
+            list[0].hidden = true;
+        }
+
         list.shift();
 
         // Notify any top layer that is has been shown
@@ -603,6 +613,13 @@ var Radius = new function () {
             // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)? Auto-pause?
             activeLayer.update();
             activeLayer.draw(canvas, context);
+
+            // If this layer got hidden during this frame, reset its timer
+            if (activeLayer.hidden) {
+                // TODO: This feels a bit like a hack... are there any downsides to this?
+                activeLayer.lastUpdate = undefined;
+                activeLayer.hidden = false;
+            }
         }
 
         requestAnimationFrame(loop);
