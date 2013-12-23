@@ -1,650 +1,51 @@
-﻿function Event() {
-    this.callbacks = [];
-}
-
-Event.prototype = {
-    constructor: Event,
-
-    addListener: function (callback) {
-        this.callbacks.push(callback);
-    },
-
-    fire: function () {
-        var callbacks = this.callbacks;
-        var length = callbacks.length;
-        for (var i = 0; i < length; i++) {
-            callbacks[i].apply(null, arguments);
-        }
-    }
-};
-
-// TODO: This could surely be optimized
-var Transform2D = {
-    createIdentity: function () {
-        return [[1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1]];
-    },
-
-    copy: function (transform) {
-        var result = [[], [], []];
-        for (var i = 0; i < 3; i++) {
-            for (var j = 0; j < 3; j++) {
-                result[i][j] = transform[i][j];
-            }
-        }
-        return result;
-    },
-
-    multiply: function (a, b, result) {
-        for (var i = 0; i < 3; i++) {
-            for (var j = 0; j < 3; j++) {
-                var value = 0;
-                for (var x = 0; x < 3; x++) {
-                    value += a[x][j] * b[i][x];
-                }
-                result[i][j] = value;
-            }
-        }
-        return result;
-    },
-
-    translate: function (transform, x, y, result) {
-        // TODO: It'd be better to not create new matrices each time...
-        var a = this.copy(transform);
-        var b = [[1, 0, x],
-                 [0, 1, y],
-                 [0, 0, 1]];
-        return this.multiply(a, b, transform);
-    },
-
-    scale: function (transform, sx, sy, result) {
-        var a = this.copy(transform);
-        var b = [[sx, 0, 0],
-                 [0, sy, 0],
-                 [0, 0, 1]];
-        return this.multiply(a, b, result);
-    },
-
-    // TODO: These could be optimized and combined so that there aren't so many unnecessary objects getting created
-    transformHomogeneous: function (a, vh) {
-        var avh = [];
-        for (var i = 0; i < 3; i++) {
-            var value = 0;
-            for (var x = 0; x < 3; x++) {
-                value += a[i][x] * vh[x];
-            }
-            avh[i] = value;
-        }
-        return avh;
-    },
-
-    transform: function (a, v) {
-        var avh = this.transformHomogeneous(a, [v[0], v[1], 1]);
-        return [avh[0] / avh[2], avh[1] / avh[2]];
-    }
-
-    // TODO: Is rotate needed?
-    // TODO: Is invert needed?
-};
-
-var keyCodeToName = {
-    //8: 'backspace',
-    //9: 'tab',
-    //13: 'enter',
-    //27: 'escape',
-    //32: 'space',
-    37: 'left',
-    38: 'up',
-    39: 'right',
-    40: 'down',
-};
-
-// Layer that contains entities to display/update
-function Layer() {
-    this.entities = [];
-    this.keyPressed = {};
-}
-
-Layer.prototype = {
-    constructor: Layer,
-
-    addEntity: function (entity) {
-        this.entities.push(entity);
-        return entity;
-    },
-
-    forEachEntity: function (f) {
-        var entities = this.entities;
-        var entityCount = entities.length;
-        for (var i = 0; i < entityCount; i++) {
-            f(entities[i]);
-        }
-    },
-
-    update: function () {
-        var now = Date.now();
-        if (this.lastUpdate !== undefined && this.lastUpdate < now) {
-            var ms = now - this.lastUpdate;
-            this.forEachEntity(function (entity) {
-                if (entity.update) {
-                    entity.update(ms);
-                }
-            });
-        }
-
-        this.lastUpdate = now;
-    },
-
-    drawEntity: function (canvas, context, entity) {
-        context.save();
-        context.translate(entity.x, entity.y);
-        context.scale(entity.width, entity.height);
-
-        if (entity.color) {
-            context.fillStyle = entity.color;
-        }
-
-        if (entity.opacity !== undefined) {
-            context.globalAlpha *= entity.opacity;
-        }
-
-        // Draw all elements
-        if (entity.elements) {
-            var elementCount = entity.elements.length;
-            for (var i = 0; i < elementCount; i++) {
-                var element = entity.elements[i];
-                context.save();
-
-                // Need to flip the coordinate system back so that text is rendered upright
-                context.scale(1, -1);
-
-                if (element.color) {
-                    context.fillStyle = element.color;
-                }
-
-                if (element.opacity !== undefined) {
-                    context.globalAlpha *= element.opacity;
-                }
-
-                if (element instanceof Rectangle) {
-                    context.fillRect(element.x, -element.y, element.width, element.height);
-                } else if (element instanceof Text && element.text) {
-                    if (element.font) {
-                        context.font = element.font;
-                    }
-
-                    context.textBaseline = element.baseline;
-                    context.textAlign = element.align;
-                    context.fillText(element.text, element.x, -element.y);
-                }
-
-                context.restore();
-            }
-        }
-
-        // Draw children
-        if (entity.children) {
-            var childCount = entity.children.length;
-            for (var i = 0; i < childCount; i++) {
-                Layer.prototype.drawEntity(canvas, context, entity.children[i]);
-            }
-        }
-
-        context.restore();
-    },
-
-    draw: function (canvas, context) {
-        context.fillStyle = 'black';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Adjust coordinate system
-        context.save();
-        context.translate(canvas.width / 2, canvas.height / 2);
-        var scale = Radius.getScale();
-        context.scale(scale, -scale);
-
-        this.forEachEntity(function (entity) {
-            Layer.prototype.drawEntity(canvas, context, entity);
-        });
-
-        context.restore();
-    }
-};
-
-function Rectangle(x, y, width, height) {
-    this.x = (x !== undefined ? x : -0.5);
-    this.y = (y !== undefined ? y : 0.5);
-    this.width = width || 1;
-    this.height = height || 1;
-}
-
-function Text(text, font, x, y, align, baseline) {
-    this.text = text;
-    this.font = font;
-    this.x = x || 0;
-    this.y = y || 0;
-    this.align = align || 'left';
-    this.baseline = baseline || 'alphabetic';
-}
-
-Text.prototype = {
-    constructor: Text,
-
-    getTotalWidth: function () {
-        return Radius.getTextWidth(this.font, this.text);
-    }
-}
-
-// Entity that can be displayed and updated each frame
-function Entity() {
-    this.x = 0;
-    this.y = 0;
-    this.width = 1;
-    this.height = 1;
-    this.color = 'white';
-}
-
-Entity.prototype = {
-    constructor: Entity,
-
-    removeChild: function (child) {
-        if (this.children) {
-            var childCount = this.children.length;
-            for (var i = 0; i < childCount; i++) {
-                if (child === this.children[i]) {
-                    this.children.splice(i, 1);
-                }
-            }
-        }
-    },
-
-    updateChildren: function (ms) {
-        if (this.children) {
-            var childCount = this.children.length;
-            for (var i = 0; i < childCount; i++) {
-                var child = this.children[i];
-                if (child.update) {
-                    child.update(ms);
-                }
-
-                // Check to see if this child should be removed
-                if (child.dead) {
-                    this.removeChild(child);
-
-                    // Update loop variables to account for the removed child
-                    childCount--;
-                    i--;
-                }
-            }
-        }
-    },
-
-    update: function (ms) {
-        this.updateChildren(ms);
-    }
-};
-
-function ScriptedEntity(entityOrElements, steps, repeat, endedCallback) {
-    Entity.apply(this);
-    // TODO: Must/should the elements be copied?
-    if (entityOrElements instanceof Entity) {
-        this.elements = entityOrElements.elements;
-        this.color = entityOrElements.color;
-    } else {
-        this.elements = entityOrElements;
-    }
-
-    this.steps = steps;
-    this.repeat = repeat;
-    this.endedCallback = endedCallback;
-
-    this.timer = 0;
-    this.stepIndex = 0;
-
-    this.x = steps[0][1];
-    this.y = steps[0][2];
-    this.width = steps[0][3];
-    this.height = steps[0][4];
-    // TODO (BREAKING): Angle?
-    this.opacity = steps[0][5];
-}
-
-ScriptedEntity.prototype = Object.create(Entity.prototype);
-
-ScriptedEntity.prototype.update = function (ms) {
-    var done = false;
-    this.timer += ms;
-    if (this.timer >= this.steps[this.stepIndex][0]) {
-        this.timer = this.timer - this.steps[this.stepIndex][0];
-        this.stepIndex++;
-
-        this.initialX = this.x;
-        this.initialY = this.y;
-        this.initialWidth = this.width;
-        this.initialHeight = this.height;
-        this.initialOpacity = this.opacity;
-
-        if (this.stepIndex >= this.steps.length) {
-            if (this.repeat) {
-                this.stepIndex = 1;
-            } else {
-                this.update = undefined;
-                done = true;
-
-                if (this.endedCallback) {
-                    this.endedCallback();
-                }
-            }
-        }
-    }
-
-    if (!done) {
-        var step = this.steps[this.stepIndex];
-
-        this.x = this.initialX + (step[1] - this.initialX) / step[0] * this.timer;
-        this.y = this.initialY + (step[2] - this.initialY) / step[0] * this.timer;
-        this.width = this.initialWidth + (step[3] - this.initialWidth) / step[0] * this.timer;
-        this.height = this.initialHeight + (step[4] - this.initialHeight) / step[0] * this.timer;
-        this.opacity = this.initialOpacity + (step[5] - this.initialOpacity) / step[0] * this.timer;
-    } else {
-        var step = this.steps[this.steps.length - 1];
-
-        this.x = step[1];
-        this.y = step[2];
-        this.width = step[3];
-        this.height = step[4];
-        this.opacity = step[5];
-    }
-};
-
-function Ghost(entity, period, scaleMax, inward, endedCallback, offsetX2, offsetY2) {
-    var initialScale = 1;
-    var finalScale = 1;
-    var opacity = (entity.opacity >= 0 ? entity.opacity : 1);
-    var finalOpacity;
-    var x2 = entity.x;
-    var y2 = entity.y;
-
-    if (inward) {
-        initialScale = scaleMax;
-        finalOpacity = opacity;
-        opacity = 0;
-    } else {
-        // Default case is outward
-        finalScale = scaleMax;
-        finalOpacity = 0;
-    }
-
-    if (offsetX2 !== undefined) {
-        x2 += offsetX2;
-    }
-
-    if (offsetY2 !== undefined) {
-        y2 += offsetY2;
-    }
-
-    ScriptedEntity.call(
-        this,
-        entity,
-        [[0, entity.x, entity.y, entity.width * initialScale, entity.height * initialScale, opacity],
-         [period, x2, y2, entity.width * finalScale, entity.height * finalScale, finalOpacity]],
-        false,
-        function () {
-            this.dead = true;
-            if (this.ghostEnded) {
-                this.ghostEnded();
-            }
-        });
-
-    this.ghostEnded = endedCallback;
-}
-
-Ghost.prototype = Object.create(ScriptedEntity.prototype);
-
-// Serializes key presses so that they show up predictably between frames
-function KeySerializer() {
-    var queuedKeyCodes = [];
-    var queuedKeyStates = [];
-
-    addEventListener('keydown', function (e) {
-        if (e.keyCode in keyCodeToName) {
-            queuedKeyCodes.push(e.keyCode);
-            queuedKeyStates.push(true);
-        }
-    }, false);
-
-    addEventListener('keyup', function (e) {
-        if (e.keyCode in keyCodeToName) {
-            queuedKeyCodes.push(e.keyCode);
-            queuedKeyStates.push(false);
-        }
-    }, false);
-
-    this.process = function (keyPressed) {
-        var count = queuedKeyCodes.length;
-        if (count > 0) {
-            for (var i = 0; i < count; i++) {
-                keyPressed(keyCodeToName[queuedKeyCodes[i]], queuedKeyStates[i]);
-            }
-
-            queuedKeyCodes.length = 0;
-            queuedKeyStates.length = 0;
-        }
-    };
-}
-
-// Serializes mouse events so that they are only handled between frames
-var MouseEvent = {
-    down: 1,
-    up: 2,
-    move: 3
-};
-
-var MouseButton = {
-    primary: 0,
-    secondary: 2,
-    tertiary: 1
-};
-
-function MouseSerializer(canvas) {
-    var queuedMouseEvents = [];
-    var queuedMousePayloads = [];
-    var disableDefault = function (e) {
-        // Disable the default action since the layer will handle this event
-        if (e.preventDefault) {
-            e.preventDefault();
-        }
-    }
-
-    canvas.addEventListener('mousedown', function (e) {
-        disableDefault(e);
-        queuedMouseEvents.push(MouseEvent.down);
-        queuedMousePayloads.push([e.clientX, e.clientY, e.button]);
-    });
-
-    canvas.addEventListener('mouseup', function (e) {
-        disableDefault(e);
-        queuedMouseEvents.push(MouseEvent.up);
-        queuedMousePayloads.push([e.clientX, e.clientY, e.button]);
-    });
-
-    canvas.addEventListener('mousemove', function (e) {
-        disableDefault(e);
-        queuedMouseEvents.push(MouseEvent.move);
-        queuedMousePayloads.push([e.clientX, e.clientY]);
-    });
-
-    this.process = function (mouseButtonPressed, mouseMoved) {
-        var count = queuedMouseEvents.length;
-        if (count > 0) {
-            for (var i = 0; i < count; i++) {
-                var event = queuedMouseEvents[i];
-                var payload = queuedMousePayloads[i];
-                switch (event) {
-                    case MouseEvent.down:
-                    case MouseEvent.up:
-                        mouseButtonPressed(payload[2], event == MouseEvent.down, payload[0], payload[1]);
-                        break;
-
-                    case MouseEvent.move:
-                        mouseMoved(payload[0], payload[1]);
-                        break;
-                }
-            }
-
-            queuedMouseEvents.length = 0;
-            queuedMousePayloads.length = 0;
-        }
-    };
-}
-
-var Radius = new function () {
-    var keySerializer = new KeySerializer();
-    var mouseSerializer;
-    var list = [];
-    var canvas;
-    var context;
-
-    // TODO (BREAKING): Shown handlers, etc.
-    this.pushLayer = function (layer) {
-        list.unshift(layer);
-    };
-
-    this.popLayer = function () {
-        list.shift();
-    };
-
-    var convertToCanvasCoordinates = function (globalX, globalY) {
-        // TODO: This rectangle could be cached... perhaps in an affine transform
-        var rect = canvas.getBoundingClientRect();
-        return [globalX - rect.left, globalY - rect.top];
-    }
-
-    // Single loop iteration
-    var loop = function () {
-        var activeLayer = list[0];
-        // TODO: Handle switching layers
-        if (activeLayer) {
-            // Handle input
-            var keyPressed = activeLayer.keyPressed;
-            keySerializer.process(function (key, pressed) {
-                var keyPressedHandler = keyPressed[key];
-                if (keyPressedHandler) {
-                    keyPressedHandler(pressed);
-                }
-            });
-
-            var mouseButtonPressed = activeLayer.mouseButtonPressed;
-            var mouseMoved = activeLayer.mouseMoved;
-
-            // TODO: This could be cached and should also share code with the canvas 
-            // TODO: The API here is ugly...
-            var transform = Transform2D.createIdentity();
-            var scale = Radius.getScale();
-            Transform2D.scale(transform, scale, -scale, transform);
-            Transform2D.translate(transform, -canvas.width / 2, canvas.height / 2, transform);
-
-            mouseSerializer.process(function (button, pressed, globalX, globalY) {
-                if (mouseButtonPressed) {
-                    var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
-                    var canvasX = canvasCoordinates[0];
-                    var canvasY = canvasCoordinates[1];
-                    var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
-                    mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
-                }
-            }, function (globalX, globalY) {
-                // TODO: Combine code with above
-                var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
-                var canvasX = canvasCoordinates[0];
-                var canvasY = canvasCoordinates[1];
-                var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
-                mouseMoved(localCoordinates[0], localCoordinates[1]);
-            });
-
-            // Update entities and draw everything
-            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)? Auto-pause?
-            activeLayer.update();
-            activeLayer.draw(canvas, context);
-        }
-
-        requestAnimationFrame(loop);
-    };
-
-    this.initialize = function (targetCanvas) {
-        canvas = targetCanvas;
-        context = canvas.getContext('2d');
-        mouseSerializer = new MouseSerializer(canvas);
-
-        // Disable default touch behavior (e.g. pan/bounce) for the canvas
-        canvas.setAttribute('style', 'touch-action: none;');
-    }
-
-    this.start = function (layer) {
-        this.pushLayer(layer);
-        loop();
-    }
-
-    this.getScale = function () {
-        return Math.min(canvas.width / 640, canvas.height / 480);
-    }
-
-    this.getTextWidth = function (font, text) {
-        context.save();
-        context.font = font;
-        var width = context.measureText(text).width;
-        context.restore();
-
-        return width;
-    }
-};
-
-function Enemy(x, y, width, height, speedX, speedY) {
-    Entity.call(this);
-    this.x = x;
-    this.y = y;
-    this.width = width;
-    this.height = height;
-    this.speed = {
-        x: speedX,
-        y: speedY
-    };
+﻿/// <reference path="radius.js" />
+/// <reference path="radius-ui.js" />
+
+function MovingObject(x, y, width, height, vx, vy) {
+    Entity.call(this, x, y, width, height);
     this.elements = [new Rectangle()];
+    this.v = {
+        x: vx,
+        y: vy
+    };
 }
 
-Enemy.prototype = Object.create(Entity.prototype);
+MovingObject.prototype = Object.create(Entity.prototype);
 
-Enemy.prototype.updateAxis = function (ms, axis, axisSize) {
-    var axisSpeed = this.speed[axis];
-    var axisPosition = this[axis] + axisSpeed * ms;
+MovingObject.prototype.updateAxis = function (ms, axis, axisSize) {
+    var v = this.v[axis];
+    var axisPosition = this[axis] + v * ms;
     if (Math.abs(axisPosition) + axisSize / 2 > 0.5) {
         // Reverse direction
-        if (axisSpeed > 0) {
+        if (v > 0) {
             axisPosition = 0.5 - axisSize / 2 - 0.01;
         } else {
             axisPosition = -0.5 + axisSize / 2 + 0.01;
         }
-        
-        this.speed[axis] = -axisSpeed;
+
+        this.v[axis] = -v;
     }
-    
+
     this[axis] = axisPosition;
 };
 
-Enemy.prototype.update = function (ms) {
+MovingObject.prototype.update = function (ms) {
     this.updateAxis(ms, 'x', this.width);
     this.updateAxis(ms, 'y', this.height);
 };
 
-function Goal() {
-    Entity.call(this);
-    this.width = 1 / 30;
-    this.height = 1 / 30;
-    this.color = 'red';
-    this.elements = [new Rectangle()];
+function Enemy(x, y, width, height, vx, vy) {
+    MovingObject.call(this, x, y, width, height, vx, vy);
 }
 
-Goal.prototype = Object.create(Entity.prototype);
+Enemy.prototype = Object.create(MovingObject.prototype);
+
+function Goal() {
+    MovingObject.call(this, 0 ,0, Board.enemyWidth, Board.enemyWidth, 0, 0);
+    this.color = 'red';
+}
+
+Goal.prototype = Object.create(MovingObject.prototype);
 
 Goal.prototype.createGhost = function () {
     return new Ghost(this, 500, 5);
@@ -751,20 +152,32 @@ function Board() {
     this.width = 400;
     this.height = 400;
     this.color = 'blue';
+    this.elements = [new Rectangle()];
+
+    this.paused = false;
+    this.difficulty = Difficulty.nameToLevel.Easy;
+    this.score = 0;
     this.player = new Player();
     this.goal = new Goal();
-    this.paused = false;
-    this.score = 0;
     this.scoreUpdated = new Event();
     this.points = 0;
     this.pointsUpdated = new Event();
     this.points = 30;
     this.lost = new Event();
-    this.elements = [new Rectangle()];
+    this.completed = new Event();
 }
 
 Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 Board.timeout = 19000;
+Board.transitionPeriod = 1000;
+Board.enemyWidth = 1 / 30;
+Board.enemyWidthMin = 1 / 90;
+Board.enemyWidthMax = 1 / 15;
+Board.enemySpeed = 0.2 / 1000;
+Board.enemySpeedMin = 0.1 / 1000;
+Board.enemySpeedMax = 0.6 / 1000;
+Board.goalSpeed = 0.1 / 1000;
+Board.goalDirectionPeriod = 3000;
 
 Board.prototype = Object.create(Entity.prototype);
 
@@ -773,8 +186,32 @@ Board.prototype.resetGoal = function () {
     var position = this.getSafePosition(this.goal.width, this.goal.height);
     this.goal.x = position[0];
     this.goal.y = position[1];
-    this.setPoints(Board.pointProgression[0]);
+    this.setPoints(Board.pointProgression[0] * (this.difficulty + 1));
     this.timer = 0;
+
+    // The goal moves on hard
+    this.goal.va = (this.difficulty >= Difficulty.nameToLevel.Hard ? Board.goalSpeed : 0);
+    this.resetGoalDirection();
+};
+
+Board.prototype.resetGoalDirection = function () {
+    var v = this.goal.va;
+
+    // Direction
+    if (Math.random() > 0.5) {
+        v = -v;
+    }
+
+    // Axis
+    if (Math.random() > 0.5) {
+        this.goal.v.x = v;
+        this.goal.v.y = 0;
+    } else {
+        this.goal.v.x = 0;
+        this.goal.v.y = v;
+    }
+
+    this.goalDirectionTimer = this.timer + Board.goalDirectionPeriod * Math.random();
 };
 
 Board.prototype.checkCollision = function (a, b) {
@@ -822,18 +259,37 @@ Board.prototype.getSafePosition = function (width, height) {
 };
 
 Board.prototype.addEnemy = function () {
-    var size = 1 / 30;
-    var speed = 0.2 / 1000;
+    var size = Board.enemyWidth;
+    var speed = Board.enemySpeed;
     var speedX = 0;
     var speedY = 0;
     var position = this.getSafePosition(size, size);
 
-    // TODO: Difficulty levels
+    // Enemy speeds vary on normal
+    if (this.difficulty >= Difficulty.nameToLevel.Normal) {
+        speed = Board.enemySpeedMin + (Board.enemySpeedMax - Board.enemySpeedMin) * Math.random();
+    }
+
+    // Enemies are faster and their sizes vary on hard
+    if (this.difficulty >= Difficulty.nameToLevel.Hard) {
+        speed *= 1.1;
+        size = Board.enemyWidthMin + (Board.enemyWidthMax - Board.enemyWidthMin) * Math.random();
+    }
 
     if (Math.random() >= 0.5) {
         speedX = speed;
     } else {
         speedY = speed;
+    }
+
+    // Enemies can move diagonally on hard
+    if (this.difficulty >= Difficulty.nameToLevel.Hard && Math.random() > 0.5) {
+        var otherSpeed = Board.enemySpeedMin + (Board.enemySpeedMax - Board.enemySpeedMin) * Math.random();
+        if (speedX === 0) {
+            speedX = otherSpeed;
+        } else {
+            speedY = otherSpeed;
+        }
     }
 
     // Animate in the new enemy
@@ -849,6 +305,7 @@ Board.prototype.lose = function () {
     this.children.push(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
+    this.finishTimer = this.timer + Board.transitionPeriod;
     this.lost.fire();
 }
 
@@ -873,7 +330,12 @@ Board.prototype.update = function (ms) {
         if (this.checkCollision(this.player, this.goal)) {
             this.captureGoal();
         } else {
-            var points = Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
+            // Update goal direction
+            if (this.difficulty >= Difficulty.nameToLevel.Hard && this.timer >= this.goalDirectionTimer) {
+                this.resetGoalDirection();
+            }
+
+            var points = (this.difficulty + 1) * Board.pointProgression[Math.max(0, Math.min(Board.pointProgression.length - 1, Math.floor(this.timer / Board.timeout * Board.pointProgression.length)))];
             if (points !== this.points) {
                 this.setPoints(points);
             }
@@ -894,6 +356,10 @@ Board.prototype.update = function (ms) {
         if (done) {
             this.lose();
         }
+    } else {
+        if (this.finishTimer > 0 && this.timer >= this.finishTimer) {
+            this.completed.fire();
+        }
     }
 };
 
@@ -908,10 +374,15 @@ Board.prototype.setPoints = function (points) {
 }
 
 Board.prototype.reset = function () {
-    this.children = [this.player, this.goal];
-
+    this.paused = false;
+    this.finishTimer = 0;
     this.setScore(0);
+    this.children = [this.player, this.goal];
     this.resetGoal();
+};
+
+Board.prototype.setDifficulty = function (difficulty) {
+    this.difficulty = difficulty;
 };
 
 function ValueDisplay(font, event, x, y, align, updatedCallback) {
@@ -969,13 +440,23 @@ Display.prototype.emphasizeScore = function () {
     background.color = 'blue';
     background.opacity = 0.85;
     var scaleMax = 2;
-    this.bigScore = this.children.push(new ScriptedEntity([background, textElement],
-        [[0, -200 + this.textHeight / 2, 200, 1, 1, 1],
-         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 1]]));
+    this.children.push(this.bigScore = new ScriptedEntity([background, textElement],
+        [[0, -200 + this.textHeight / 2, 200, 1, 1, 0, 1],
+         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 0, 1]]));
+};
+
+Display.prototype.reset = function () {
+    // TODO: Suppress effects?
+    // TODO: There is some weird flashing when switching to a second game...
+    if (this.bigScore) {
+        this.removeChild(this.bigScore);
+        this.bigScore = null;
+    }
 };
 
 function GameLayer() {
     Layer.apply(this);
+    this.done = false;
     this.board = this.addEntity(new Board());
     this.display = this.addEntity(new Display(this.board));
     this.board.reset();
@@ -985,8 +466,13 @@ function GameLayer() {
         display.emphasizeScore();
     });
 
+    var gameLayer = this;
+    this.board.completed.addListener(function () {
+        gameLayer.done = true;
+    });
+
     var board = this.board;
-    this.keyPressed = {
+    this.keyPressedHandlers = {
         left: function (pressed) {
             board.player.setMovingLeftState(pressed);
         },
@@ -1001,14 +487,26 @@ function GameLayer() {
 
         down: function (pressed) {
             board.player.setMovingDownState(pressed);
+        },
+
+        enter: function (pressed) {
+            // TODO: Really, any key should be able to quit, but this will require modifying the event handling...
+            if (pressed && gameLayer.done) {
+                gameLayer.endGame();
+            }
         }
     };
 
+    // TODO: Why aren't these in the prototype instead?
     this.mouseButtonPressed = function (button, pressed, x, y) {
         if (button == MouseButton.primary) {
             if (pressed) {
                 // TODO: This is ugly
-                board.player.setTarget(x / board.width, y / board.height);
+                if (gameLayer.done) {
+                    gameLayer.endGame();
+                } else {
+                    board.player.setTarget(x / board.width, y / board.height);
+                }
             } else {
                 board.player.clearTarget();
             }
@@ -1022,8 +520,146 @@ function GameLayer() {
 
 GameLayer.prototype = Object.create(Layer.prototype);
 
+GameLayer.prototype.reset = function () {
+    this.done = false;
+    this.board.reset();
+    this.display.reset();
+};
+
+GameLayer.prototype.setDifficulty = function (difficulty) {
+    this.board.setDifficulty(difficulty);
+};
+
+GameLayer.prototype.start = function () {
+    Radius.pushLayer(this);
+};
+
+GameLayer.prototype.endGame = function () {
+    this.reset();
+    this.done = true;
+    Radius.popLayer();
+};
+
+Difficulty = {
+    levelToName: ['Easy', 'Normal', 'Hard'],
+    nameToLevel: {
+        Easy: 0,
+        Normal: 1,
+        Hard: 2
+    }
+};
+
+function Logo() {
+    Entity.call(this);
+    this.desiredWidth = 1;
+    this.desiredHeight = 1;
+
+    // Animation
+    var chaseX = 0.2;
+    var chaseY = -0.2;
+    var chaseX2 = 0.8;
+    var chaseY2 = -0.8;
+    var chaseSize = 0.25;
+    var chasePeriod = 3000;
+
+    var background = new Entity(0.5, -0.5, 0.95, 0.95);
+    background.elements = [new Rectangle()];
+    background.color = 'blue';
+    this.children = [
+        background,
+        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'green')], [
+            [0, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+        ], true),
+        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'red')], [
+            [0, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+        ], true),
+        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'white')], [
+            [0, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
+            [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
+        ], true),
+    ];
+}
+
+Logo.prototype = Object.create(Entity.prototype);
+
+Logo.prototype.setLayer = function (layer) {
+    layer.addEntity(this);
+};
+
+Logo.prototype.getPosition = function () {
+    return [this.x, this.y];
+};
+
+Logo.prototype.setPosition = function (x, y) {
+    this.x = x;
+    this.y = y;
+};
+
+Logo.prototype.getActive = function () {
+    return false;
+}
+
+Logo.prototype.getMinimumSize = function () {
+    return [this.desiredWidth, this.desiredHeight];
+}
+
+Logo.prototype.getDesiredSize = Logo.prototype.getMinimumSize;
+Logo.prototype.getSize = Logo.prototype.getMinimumSize;
+
+Logo.prototype.setSize = function (width, height) {
+    // Maintain aspect ratio
+    this.desiredWidth = Math.max(width, height);
+    this.desiredHeight = this.desiredWidth;
+    this.width = this.desiredWidth;
+    this.height = this.desiredHeight;
+};
+
+function MainMenu() {
+    this.gameLayer = new GameLayer();
+
+    var difficultyChoice = new Choice('Difficulty', Difficulty.levelToName);
+    var mainMenu = this;
+    difficultyChoice.choiceChanged.addListener(function (difficultyName) {
+        mainMenu.difficulty = Difficulty.nameToLevel[difficultyName];
+    });
+
+    FormLayer.call(this, new NestedFlowForm(1, [
+        new NestedFlowForm(3, [
+            new Title('Avoision'),
+            new Label('  '),
+            new Logo()
+            ]),
+        new Separator(),
+        new Button('Start New Game', function () { mainMenu.startNewGame(); }),
+        difficultyChoice
+    ]));
+}
+
+MainMenu.prototype = Object.create(FormLayer.prototype);
+
+MainMenu.prototype.startNewGame = function () {
+    // TODO: Instructions
+    if (this.difficulty) {
+        this.gameLayer.setDifficulty(this.difficulty);
+    }
+
+    this.gameLayer.reset();
+    this.gameLayer.start();
+};
+
 window.onload = function () {
     // TODO: Consider automatic resizing (e.g. to fill the screen)
     Radius.initialize(document.getElementById('canvas'));
-    Radius.start(new GameLayer());
+    Radius.start(new MainMenu());
 }
