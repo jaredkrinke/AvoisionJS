@@ -1,0 +1,25 @@
+﻿For touch support:
+Touch controls
+Fullscreen mode
+Click/tap routing in the choice control
+
+Finishing off the beta:
+Handle long delays between frames
+Instructions menu
+Images
+Pause screen?
+Center the title
+
+Finishing off 1.0:
+Sound
+High scores (including local persistence)
+High scores (include global persistence)
+Customizable controls?
+Option persistence
+Music?
+Go through TODOs in the code
+Launch on http://avsn.sf.net/
+
+Beyond 1.0:
+Optimize transformations
+Port to Windows 8?
