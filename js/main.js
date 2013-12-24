@@ -453,17 +453,76 @@ Display.prototype.reset = function () {
     }
 };
 
-function CharacterButton(character, direction, x, y) {
-    Entity.call(this, x, y, 64, 64);
-    this.direction = direction;
-    this.elements = [
-        new Rectangle(-0.475, 0.475, 0.95, 0.95, 'gray'),
-        new Rectangle(-0.45, 0.45, 0.9, 0.9, 'black'),
-        new Text(character, '1px sans-serif', 0, 0, 'center', 'middle')
-    ];
+function AdaptiveJoystick(x1, y1, x2, y2) {
+    Entity.call(this);
+    this.x1 = x1;
+    this.y1 = y1;
+    this.x2 = x2;
+    this.y2 = y2;
+    // TODO: Use outlined circles instead?
+    this.outline = new Entity(0, 0, 64, 64);
+    this.outline.elements = [new Rectangle(-0.5, 0.5, 1, 1, 'gray')];
+    this.outline.opacity = 0.7;
+    this.reticle = new Entity(0, 0, 48, 48);
+    this.reticle.elements = [new Rectangle(-0.05, 0.5, 0.1, 1), new Rectangle(-0.5, 0.05, 1, 0.1)];
+
+    this.manipulationStarted = new Event();
+    this.manipulationUpdated = new Event();
+    this.manipulationEnded = new Event();
+
+    this.manipulationRunning = false;
+    this.children = [];
 }
 
-CharacterButton.prototype = Object.create(Entity.prototype);
+// TODO: Rename the class and these two variables
+AdaptiveJoystick.maxOffset = 48;
+AdaptiveJoystick.minOffset = 16;
+AdaptiveJoystick.prototype = Object.create(Entity.prototype);
+
+AdaptiveJoystick.prototype.intersects = function (x, y) {
+    return (x >= this.x1 && x <= this.x2 && y >= this.y1 && y <= this.y2);
+};
+
+AdaptiveJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    if (button == MouseButton.primary) {
+        if (pressed) {
+            // Show the joystick
+            this.outline.x = x;
+            this.outline.y = y;
+            this.reticle.x = x;
+            this.reticle.y = y;
+            this.children.push(this.outline);
+            this.children.push(this.reticle);
+
+            this.manipulationRunning = true;
+            this.manipulationStarted.fire();
+        } else {
+            // Hide the joystick
+            this.children.length = 0;
+            this.manipulationRunning = false;
+            this.manipulationEnded.fire();
+        }
+    }
+};
+
+AdaptiveJoystick.prototype.mouseMoved = function (x, y) {
+    if (this.manipulationRunning) {
+        // Check to see if the distance is enough to register
+        var dx = x - this.reticle.x;
+        var dy = y - this.reticle.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        var angle = Math.atan2(dy, dx);
+        if (distance >= AdaptiveJoystick.minOffset) {
+            this.manipulationUpdated.fire(angle);
+        } else {
+            this.manipulationUpdated.fire();
+        }
+
+        // Update the outline
+        this.outline.x = this.reticle.x + Math.min(distance, AdaptiveJoystick.maxOffset) * Math.cos(angle);
+        this.outline.y = this.reticle.y + Math.min(distance, AdaptiveJoystick.maxOffset) * Math.sin(angle);
+    }
+};
 
 function GameLayer() {
     Layer.apply(this);
@@ -472,11 +531,25 @@ function GameLayer() {
     this.display = this.addEntity(new Display(this.board));
 
     // Touch controls
-    this.leftArrow = this.addEntity(new CharacterButton('<', 'left', 150, -198));
-    this.downArrow = this.addEntity(new CharacterButton('v', 'down', 214, -198));
-    this.rightArrow = this.addEntity(new CharacterButton('>', 'right', 278, -198));
-    this.upArrow = this.addEntity(new CharacterButton('^', 'up', 214, -134));
-    this.arrows = [this.leftArrow, this.downArrow, this.rightArrow, this.upArrow];
+    // TODO: Allow manipulations off the coordinate system as well (for strange aspect ratios)
+    var gameLayer = this;
+    var board = this.board;
+    var bigDistance = this.board.width * 2; // Needs to be larger than width or height
+    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -240, 320, 240));
+    this.touchJoystick.manipulationStarted.addListener(function () {
+        gameLayer.touchManipulationInProgress = true;
+    });
+    this.touchJoystick.manipulationEnded.addListener(function () {
+        gameLayer.touchManipulationInProgress = false;
+        board.player.clearTarget();
+    });
+    this.touchJoystick.manipulationUpdated.addListener(function (angle) {
+        if (angle) {
+            gameLayer.board.player.setTarget(bigDistance * Math.cos(angle), bigDistance * Math.sin(angle));
+        } else {
+            gameLayer.board.player.clearTarget();
+        }
+    });
 
     this.board.reset();
 
@@ -485,12 +558,10 @@ function GameLayer() {
         display.emphasizeScore();
     });
 
-    var gameLayer = this;
     this.board.completed.addListener(function () {
         gameLayer.done = true;
     });
 
-    var board = this.board;
     this.keyPressedHandlers = {
         left: function (pressed) {
             board.player.setMovingLeftState(pressed);
@@ -524,35 +595,15 @@ function GameLayer() {
                     gameLayer.endGame();
                 }
             } else {
-                // Check to see if an arrow button was being held down
-                if (this.arrowButtonPressed === undefined) {
-                    // No arrow button was held down, so handle as a new press and check for intersection with arrow buttons
-                    var arrowCount = this.arrows.length;
-                    for (var i = 0; i < arrowCount; i++) {
-                        var arrow = this.arrows[i];
-                        if (x >= arrow.x - arrow.width / 2 && x <= arrow.x + arrow.width / 2 && y >= arrow.y - arrow.height / 2 && y <= arrow.y + arrow.height / 2) {
-                            break;
-                        }
-                    }
-
-                    if (i < arrowCount) {
-                        // The new press is on an arrow button, so switch to arrow button input mode
-                        this.arrowButtonPressed = i;
+                // Check to see if this should be routed to the touch joystick (i.e.g either a manipulation is running
+                // or this is a new interaction originating within the touch joystick's area)
+                if (gameLayer.touchManipulationInProgress || (pressed && gameLayer.touchJoystick.intersects(x, y))) {
+                    gameLayer.touchJoystick.mouseButtonPressed(button, pressed, x, y);
+                } else {
+                    if (pressed) {
+                        board.player.setTarget((x - board.x) / board.width, (y - board.y) / board.height);
                     } else {
-                        // The new press wasn't on an arrow button, so move towards the point
-                        if (pressed) {
-                            board.player.setTarget((x - board.x) / board.width, (y - board.y) / board.height);
-                        } else {
-                            board.player.clearTarget();
-                        }
-                    }
-                }
-
-                if (this.arrowButtonPressed !== undefined) {
-                    // An arrow button was being held, so wait for the release...
-                    this.keyPressedHandlers[this.arrows[this.arrowButtonPressed].direction](pressed);
-                    if (!pressed) {
-                        this.arrowButtonPressed = undefined;
+                        board.player.clearTarget();
                     }
                 }
             }
@@ -560,7 +611,11 @@ function GameLayer() {
     };
 
     this.mouseMoved = function (x, y) {
-        board.player.updateTarget((x - board.x) / board.width, (y - board.y) / board.height);
+        if (gameLayer.touchManipulationInProgress) {
+            gameLayer.touchJoystick.mouseMoved(x, y);
+        } else {
+            board.player.updateTarget((x - board.x) / board.width, (y - board.y) / board.height);
+        }
     }
 }
 
