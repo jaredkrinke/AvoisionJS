@@ -1,5 +1,9 @@
-﻿For touch support:
-Touch controls
+﻿Bugs:
+Clicking anywhere on a form will activate the selected control
+Barely missing touch controls causes target-based movement which is almost certainly not what the player wants
+
+For touch support:
+Adaptive touch joystick
 Fullscreen mode
 Click/tap routing in the choice control
 
