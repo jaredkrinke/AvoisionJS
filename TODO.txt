@@ -4,6 +4,7 @@ Should hitting "escape" exit fullscreen mode by default?
 
 For touch support:
 Click/tap routing in the choice control
+Make menus more touchable (maybe just bigger)
 
 Finishing off the beta:
 Handle long delays between frames
