@@ -531,11 +531,10 @@ function GameLayer() {
     this.display = this.addEntity(new Display(this.board));
 
     // Touch controls
-    // TODO: Allow manipulations off the coordinate system as well (for strange aspect ratios)
     var gameLayer = this;
     var board = this.board;
     var bigDistance = this.board.width * 2; // Needs to be larger than width or height
-    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -240, 320, 240));
+    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -10000, 10000, 10000));
     this.touchJoystick.manipulationStarted.addListener(function () {
         gameLayer.touchManipulationInProgress = true;
     });
