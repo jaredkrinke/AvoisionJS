@@ -9,11 +9,11 @@ Make menus more touchable (maybe just bigger)
 Finishing off the beta:
 Handle long delays between frames
 Instructions menu
-Images
 Pause screen?
 Center the title
 
 Finishing off 1.0:
+Images
 Sound
 High scores (including local persistence)
 High scores (include global persistence)
