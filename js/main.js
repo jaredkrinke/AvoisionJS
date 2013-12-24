@@ -735,6 +735,12 @@ function MainMenu() {
         mainMenu.difficulty = Difficulty.nameToLevel[difficultyName];
     });
 
+    var fullscreenOptions = ['Off', 'On'];
+    var fullscreenChoice = new Choice('Fullscreen', fullscreenOptions);
+    fullscreenChoice.choiceChanged.addListener(function (text) {
+        Radius.setFullscreen(text === fullscreenOptions[1]);
+    });
+
     FormLayer.call(this, new NestedFlowForm(1, [
         new NestedFlowForm(3, [
             new Title('Avoision'),
@@ -743,7 +749,8 @@ function MainMenu() {
             ]),
         new Separator(),
         new Button('Start New Game', function () { mainMenu.startNewGame(); }),
-        difficultyChoice
+        difficultyChoice,
+        fullscreenChoice
     ]));
 }
 
