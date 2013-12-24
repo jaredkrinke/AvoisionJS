@@ -564,6 +564,45 @@ var Radius = new function () {
         }
     };
 
+    var noBordersOrMarginsStyle = 'margin: 0px; padding: 0px; border: 0px; width: 100%; height: 100%; overflow: hidden;'
+    var html = document.getElementsByTagName('html')[0];
+    var body = document.getElementsByTagName('body')[0];
+    var resizeHandler = function () {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    };
+
+    this.setFullscreen = function (fullscreen) {
+        if (!this.fullscreen && fullscreen) {
+            // Resize the canvas
+            this.originalCanvasWidth = canvas.width;
+            this.originalCanvasHeight = canvas.height;
+            resizeHandler();
+
+            // Remove margins/padding/borders/scrollbars on containers
+            this.originalHtmlStyle = html.getAttribute('style');
+            this.originalBodyStyle = body.getAttribute('style');
+            html.setAttribute('style', noBordersOrMarginsStyle);
+            body.setAttribute('style', noBordersOrMarginsStyle);
+
+            // Add a handler for "resize" events
+            window.addEventListener('resize', resizeHandler, false);
+        } else if (this.fullscreen && !fullscreen) {
+            // Reset canvas size
+            canvas.width = this.originalCanvasWidth;
+            canvas.height = this.originalCanvasHeight;
+
+            // Reset body/html styles
+            html.setAttribute('style', this.originalHtmlStyle);
+            body.setAttribute('style', this.originalBodyStyle);
+
+            // Remove "resize" handler
+            window.removeEventListener('resize', resizeHandler);
+        }
+
+        this.fullscreen = fullscreen;
+    };
+
     var convertToCanvasCoordinates = function (globalX, globalY) {
         // TODO: This rectangle could be cached... perhaps in an affine transform
         var rect = canvas.getBoundingClientRect();
@@ -586,9 +625,9 @@ var Radius = new function () {
             // TODO: This could be cached and should also share code with the canvas 
             // TODO: The API here is ugly...
             var transform = Transform2D.createIdentity();
-            var scale = Radius.getScale();
+            var scale = 1 / Radius.getScale();
+            Transform2D.translate(transform, -canvas.width / 2, -canvas.height / 2, transform);
             Transform2D.scale(transform, scale, -scale, transform);
-            Transform2D.translate(transform, -canvas.width / 2, canvas.height / 2, transform);
 
             mouseSerializer.process(function (button, pressed, globalX, globalY) {
                 if (mouseButtonPressed) {

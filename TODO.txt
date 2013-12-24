@@ -1,10 +1,8 @@
 ﻿Bugs:
 Clicking anywhere on a form will activate the selected control
-Barely missing touch controls causes target-based movement which is almost certainly not what the player wants
+Should hitting "escape" exit fullscreen mode by default?
 
 For touch support:
-Adaptive touch joystick
-Fullscreen mode
 Click/tap routing in the choice control
 
 Finishing off the beta:

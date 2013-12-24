@@ -531,11 +531,10 @@ function GameLayer() {
     this.display = this.addEntity(new Display(this.board));
 
     // Touch controls
-    // TODO: Allow manipulations off the coordinate system as well (for strange aspect ratios)
     var gameLayer = this;
     var board = this.board;
     var bigDistance = this.board.width * 2; // Needs to be larger than width or height
-    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -240, 320, 240));
+    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -10000, 10000, 10000));
     this.touchJoystick.manipulationStarted.addListener(function () {
         gameLayer.touchManipulationInProgress = true;
     });
@@ -735,6 +734,12 @@ function MainMenu() {
         mainMenu.difficulty = Difficulty.nameToLevel[difficultyName];
     });
 
+    var fullscreenOptions = ['Off', 'On'];
+    var fullscreenChoice = new Choice('Fullscreen', fullscreenOptions);
+    fullscreenChoice.choiceChanged.addListener(function (text) {
+        Radius.setFullscreen(text === fullscreenOptions[1]);
+    });
+
     FormLayer.call(this, new NestedFlowForm(1, [
         new NestedFlowForm(3, [
             new Title('Avoision'),
@@ -743,7 +748,8 @@ function MainMenu() {
             ]),
         new Separator(),
         new Button('Start New Game', function () { mainMenu.startNewGame(); }),
-        difficultyChoice
+        difficultyChoice,
+        fullscreenChoice
     ]));
 }
 
