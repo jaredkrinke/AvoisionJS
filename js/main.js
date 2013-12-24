@@ -147,10 +147,8 @@ Player.prototype.update = function (ms) {
     }
 };
 
-function Board() {
-    Entity.call(this);
-    this.width = 400;
-    this.height = 400;
+function Board(x, y, width, height) {
+    Entity.call(this, x, y, width, height);
     this.color = 'blue';
     this.elements = [new Rectangle()];
 
@@ -407,6 +405,7 @@ ValueDisplay.prototype = Object.create(Entity.prototype);
 
 function Display(board) {
     Entity.apply(this);
+    this.board = board;
     this.children = [];
 
     var font = '32px sans-serif';
@@ -417,13 +416,13 @@ function Display(board) {
         display.children.push(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
     }
 
-    var scoreLabel = new Text('Score: ', font, -200, 200, 'left', 'bottom');
+    var scoreLabel = new Text('Score: ', font, board.x - board.width / 2, board.height / 2, 'left', 'bottom');
     var padding = (new Text('00', font)).getTotalWidth();
-    var pointLabel = new Text('Points: ', font, 200 - padding, 200, 'right', 'bottom');
+    var pointLabel = new Text('Points: ', font, board.x + board.width / 2 - padding, board.height / 2, 'right', 'bottom');
     this.elements = [scoreLabel, pointLabel];
     // TODO: Don't add the effect when the game first starts
-    this.children.push(this.scoreDisplay = new ValueDisplay(font, board.scoreUpdated, -200 + scoreLabel.getTotalWidth(), 200, 'left', addUpdateEffect));
-    this.children.push(new ValueDisplay(font, board.pointsUpdated, 200, 200, 'right', addUpdateEffect));
+    this.children.push(this.scoreDisplay = new ValueDisplay(font, board.scoreUpdated, board.x - board.width / 2 + scoreLabel.getTotalWidth(), board.height / 2, 'left', addUpdateEffect));
+    this.children.push(new ValueDisplay(font, board.pointsUpdated, board.x + board.width / 2, board.height / 2, 'right', addUpdateEffect));
 
     this.font = font;
     this.textHeight = textHeight;
@@ -441,8 +440,8 @@ Display.prototype.emphasizeScore = function () {
     background.opacity = 0.85;
     var scaleMax = 2;
     this.children.push(this.bigScore = new ScriptedEntity([background, textElement],
-        [[0, -200 + this.textHeight / 2, 200, 1, 1, 0, 1],
-         [1000, -textWidth * scaleMax / 2, 0, scaleMax, scaleMax, 0, 1]]));
+        [[0, this.board.x - this.board.width / 2 + this.textHeight / 2, this.board.height / 2, 1, 1, 0, 1],
+         [1000, this.board.x - textWidth * scaleMax / 2, this.board.y, scaleMax, scaleMax, 0, 1]]));
 };
 
 Display.prototype.reset = function () {
@@ -454,11 +453,31 @@ Display.prototype.reset = function () {
     }
 };
 
+function CharacterButton(character, direction, x, y) {
+    Entity.call(this, x, y, 64, 64);
+    this.direction = direction;
+    this.elements = [
+        new Rectangle(-0.475, 0.475, 0.95, 0.95, 'gray'),
+        new Rectangle(-0.45, 0.45, 0.9, 0.9, 'black'),
+        new Text(character, '1px sans-serif', 0, 0, 'center', 'middle')
+    ];
+}
+
+CharacterButton.prototype = Object.create(Entity.prototype);
+
 function GameLayer() {
     Layer.apply(this);
     this.done = false;
-    this.board = this.addEntity(new Board());
+    this.board = this.addEntity(new Board(-110, 0, 400, 400));
     this.display = this.addEntity(new Display(this.board));
+
+    // Touch controls
+    this.leftArrow = this.addEntity(new CharacterButton('<', 'left', 150, -198));
+    this.downArrow = this.addEntity(new CharacterButton('v', 'down', 214, -198));
+    this.rightArrow = this.addEntity(new CharacterButton('>', 'right', 278, -198));
+    this.upArrow = this.addEntity(new CharacterButton('^', 'up', 214, -134));
+    this.arrows = [this.leftArrow, this.downArrow, this.rightArrow, this.upArrow];
+
     this.board.reset();
 
     var display = this.display;
@@ -500,21 +519,48 @@ function GameLayer() {
     // TODO: Why aren't these in the prototype instead?
     this.mouseButtonPressed = function (button, pressed, x, y) {
         if (button == MouseButton.primary) {
-            if (pressed) {
-                // TODO: This is ugly
-                if (gameLayer.done) {
+            if (gameLayer.done) {
+                if (pressed) {
                     gameLayer.endGame();
-                } else {
-                    board.player.setTarget(x / board.width, y / board.height);
                 }
             } else {
-                board.player.clearTarget();
+                // Check to see if an arrow button was being held down
+                if (this.arrowButtonPressed === undefined) {
+                    // No arrow button was held down, so handle as a new press and check for intersection with arrow buttons
+                    var arrowCount = this.arrows.length;
+                    for (var i = 0; i < arrowCount; i++) {
+                        var arrow = this.arrows[i];
+                        if (x >= arrow.x - arrow.width / 2 && x <= arrow.x + arrow.width / 2 && y >= arrow.y - arrow.height / 2 && y <= arrow.y + arrow.height / 2) {
+                            break;
+                        }
+                    }
+
+                    if (i < arrowCount) {
+                        // The new press is on an arrow button, so switch to arrow button input mode
+                        this.arrowButtonPressed = i;
+                    } else {
+                        // The new press wasn't on an arrow button, so move towards the point
+                        if (pressed) {
+                            board.player.setTarget((x - board.x) / board.width, (y - board.y) / board.height);
+                        } else {
+                            board.player.clearTarget();
+                        }
+                    }
+                }
+
+                if (this.arrowButtonPressed !== undefined) {
+                    // An arrow button was being held, so wait for the release...
+                    this.keyPressedHandlers[this.arrows[this.arrowButtonPressed].direction](pressed);
+                    if (!pressed) {
+                        this.arrowButtonPressed = undefined;
+                    }
+                }
             }
         }
     };
 
     this.mouseMoved = function (x, y) {
-        board.player.updateTarget(x / board.width, y / board.height);
+        board.player.updateTarget((x - board.x) / board.width, (y - board.y) / board.height);
     }
 }
 
