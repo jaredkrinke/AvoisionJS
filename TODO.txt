@@ -1,5 +1,4 @@
 ﻿Bugs:
-Clicking anywhere on a form will activate the selected control
 Should hitting "escape" exit fullscreen mode by default?
 
 For touch support:

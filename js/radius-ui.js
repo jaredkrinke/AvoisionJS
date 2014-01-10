@@ -144,6 +144,9 @@ function Form(x, y, desiredWidth, desiredHeight, layout, components) {
         right: Form.prototype.moveRight,
         enter: Form.prototype.activate
     };
+
+    this.mouseButtonPressedHandlers = {};
+    this.mouseButtonPressedHandlers[MouseButton.primary] = Form.prototype.activate;
 }
 
 Form.defaultX = -200;
@@ -311,29 +314,51 @@ Form.prototype = {
         return intersectingComponent;
     },
 
-    mouseMoved: function (x, y) {
-        var handled = false;
+    mouseMovedOrPressed: function (processingPress, button, pressed, x, y) {
+        // Handle the move first
         var component = this.getComponentAtPosition(x, y);
+        var moveHandled = false;
         if (component) {
             if (this.focusedNode !== component) {
                 this.changeFocus(component);
             }
 
             if (component.mouseMoved) {
-                handled = component.mouseMoved(x, y);
+                moveHandled = component.mouseMoved(x, y);
             }
         }
 
-        return handled;
+        // Now handle the press
+        var pressHandled = false;
+        if (processingPress) {
+            if (component) {
+                // Check for button press event handler
+                if (component.mouseButtonPressed) {
+                    pressHandled = component.mouseButtonPressed(button, pressed, x, y);
+                }
+
+                if (!pressHandled) {
+                    // No button press handler, so the form will handle this
+                    var handler = this.mouseButtonPressedHandlers[button];
+                    if (handler) {
+                        if (pressed) {
+                            pressHandled = handler.call(this, button, pressed, x, y);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Only mark as handled if the triggering event type was handled
+        return (processingPress && pressHandled) || (!processingPress && moveHandled);
+    },
+
+    mouseMoved: function (x, y) {
+        return this.mouseMovedOrPressed(false, null, null, x, y);
     },
 
     mouseButtonPressed: function (button, pressed, x, y) {
-        // TODO: This is kind of a hack...
-        // Move first
-        this.mouseMoved(x, y);
-
-        // Now handle the press as though enter were pressed...
-        return this.keyPressed('enter', pressed);
+        return this.mouseMovedOrPressed(true, button, pressed, x, y);
     },
 
     add: function (component) {
