@@ -5,10 +5,11 @@ function Label(text, alignment, textHeight, font) {
     this.alignment = alignment || 'left';
     this.elements = [this.textElement = new Text('', font || Label.font, undefined, undefined, this.alignment)];
     this.totalHeight = textHeight || Label.textHeight;
+    this.verticalPadding = this.totalHeight * 0.3;
     this.setText(text);
 }
 
-Label.textHeight = 24;
+Label.textHeight = 36;
 Label.font = Label.textHeight + 'px sans-serif';
 Label.prototype = Object.create(Entity.prototype);
 Label.alignmentToSetX = {
@@ -49,7 +50,7 @@ Label.prototype.setPosition = function (x, y) {
     this.componentY = y;
     var setX = Label.alignmentToSetX[this.alignment];
     setX.call(this, x);
-    this.y = y - this.totalHeight;
+    this.y = y - this.totalHeight + this.verticalPadding / 2;
 };
 
 Label.prototype.getActive = function () {
@@ -57,7 +58,7 @@ Label.prototype.getActive = function () {
 };
 
 Label.prototype.getMinimumSize = function () {
-    return [this.textElement.getTotalWidth(), this.totalHeight];
+    return [this.textElement.getTotalWidth(), this.totalHeight + this.verticalPadding];
 };
 
 Label.prototype.getDesiredSize = function () {
@@ -65,7 +66,7 @@ Label.prototype.getDesiredSize = function () {
 };
 
 Label.prototype.getSize = function () {
-    return [this.totalWidth, this.totalHeight];
+    return [this.totalWidth, this.totalHeight + this.verticalPadding];
 };
 
 Label.prototype.setSize = function (width, height) {
@@ -89,7 +90,7 @@ function Title(text) {
     Label.call(this, text, 'center', Title.textHeight, Title.font);
 }
 
-Title.textHeight = 48;
+Title.textHeight = Label.textHeight * 1.8;
 Title.font = Title.textHeight + 'px sans-serif';
 Title.prototype = Object.create(Label.prototype);
 
