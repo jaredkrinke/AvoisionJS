@@ -1,11 +1,11 @@
 ﻿/// <reference path="radius.js" />
 
-function Label(text, alignment, textHeight, font) {
+function Label(text, alignment, textHeight, font, verticalPadding) {
     Entity.apply(this);
     this.alignment = alignment || 'left';
     this.elements = [this.textElement = new Text('', font || Label.font, undefined, undefined, this.alignment)];
     this.totalHeight = textHeight || Label.textHeight;
-    this.verticalPadding = this.totalHeight * 0.3;
+    this.verticalPadding = (verticalPadding !== undefined ? verticalPadding : this.totalHeight * 0.3);
     this.setText(text);
 }
 
@@ -87,7 +87,7 @@ function Separator() {
 Separator.prototype = Object.create(Label.prototype);
 
 function Title(text) {
-    Label.call(this, text, 'center', Title.textHeight, Title.font);
+    Label.call(this, text, 'center', Title.textHeight, Title.font, 0);
 }
 
 Title.textHeight = Label.textHeight * 1.8;
@@ -446,11 +446,12 @@ Form.prototype = {
     // TODO: Nested focus/unfocus
 };
 
-var columnLayout = function (columns, pad, columnWidths) {
-    // Determine minimum column widths and row heights
+var columnLayout = function (columns, pad, columnWidths, alignment) {
+    // Determine minimum column widths, row minimum widths, and row heights
     var fixed = !!columnWidths;
 
     var rowHeights = [0];
+    var rowMinimumWidths = [0];
     var column;
     var row = 0;
 
@@ -468,6 +469,7 @@ var columnLayout = function (columns, pad, columnWidths) {
         var component = components[i];
         var minimumSize = component.getMinimumSize();
         rowHeights[row] = Math.max(rowHeights[row], minimumSize[1]);
+        rowMinimumWidths[row] += minimumSize[0];
 
         if (!fixed) {
             columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
@@ -478,6 +480,7 @@ var columnLayout = function (columns, pad, columnWidths) {
         if (column === 0) {
             row++;
             rowHeights[row] = 0;
+            rowMinimumWidths[row] = 0;
         }
     }
 
@@ -523,7 +526,10 @@ var columnLayout = function (columns, pad, columnWidths) {
             column = 0;
             row++;
 
-            // TODO: Special case for centered flow layout
+            // Special case for centered flow layout
+            if (!pad && this.desiredWidth && alignment === 'center') {
+                x = this.x + this.desiredWidth / 2 - rowMinimumWidths[row] / 2;
+            }
         }
 
         var componentWidth = columnWidths[column];
@@ -554,7 +560,7 @@ function FlowForm(columns, x, y, desiredWidth, desiredHeight, components) {
 }
 
 FlowForm.layout = function () {
-    columnLayout.call(this, this.columns, false);
+    columnLayout.call(this, this.columns, false, undefined, this.alignment);
 };
 
 FlowForm.prototype = Object.create(Form.prototype);
@@ -564,6 +570,13 @@ function NestedFlowForm(columns, components) {
 }
 
 NestedFlowForm.prototype = Object.create(FlowForm.prototype);
+
+function NestedCenterFlowForm(columns, components) {
+    this.alignment = 'center';
+    FlowForm.call(this, columns, undefined, undefined, undefined, undefined, components);
+}
+
+NestedCenterFlowForm.prototype = Object.create(FlowForm.prototype);
 
 // Grid forms
 function GridForm(columns, x, y, desiredWidth, desiredHeight, components) {

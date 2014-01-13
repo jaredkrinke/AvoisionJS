@@ -1,10 +1,6 @@
 ﻿Bugs:
 Should hitting "escape" exit fullscreen mode by default?
 
-Finishing off the beta:
-Pause screen?
-Center the title
-
 Finishing off 1.0:
 Images
 Sound
