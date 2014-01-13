@@ -2,7 +2,6 @@
 Should hitting "escape" exit fullscreen mode by default?
 
 Finishing off the beta:
-Handle long delays between frames
 Instructions menu
 Pause screen?
 Center the title
