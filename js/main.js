@@ -651,8 +651,8 @@ Difficulty = {
 
 function Logo() {
     Entity.call(this);
-    this.desiredWidth = 1;
-    this.desiredHeight = 1;
+    this.desiredWidth = Title.textHeight;
+    this.desiredHeight = Title.textHeight;
 
     // Animation
     var chaseX = 0.2;
@@ -725,6 +725,43 @@ Logo.prototype.setSize = function (width, height) {
     this.height = this.desiredHeight;
 };
 
+function InstructionsMenu() {
+    var textHeight = 18;
+    var font = '18px sans-serif';
+    FormLayer.call(this, new NestedGridForm(1, [
+        new Title('How to Play'),
+        new NestedFlowForm(1, [
+            new Label('', null, textHeight, font),
+            new Label('', null, textHeight, font),
+            new Label('MOVE the green square using the arrow keys,', null, textHeight, '18px sans-serif'),
+            new Label('clicking/tapping on the game area,', null, textHeight, font),
+            new Label('or with the virtual joystick to the right of the game', null, textHeight, font),
+            new Label('', null, textHeight, font),
+            new Label('HIT the red square to score points', null, textHeight, font),
+            new Label('(the faster you get to it, the more points you score)', null, textHeight, font),
+            new Label('', null, textHeight, font),
+            new Label('AVOID the obstacles that appear', null, textHeight, font),
+            new Label('', null, textHeight, font),
+            new Label('COMPETE to get the highest score!', null, textHeight, font)
+        ])
+    ]));
+}
+
+InstructionsMenu.prototype = Object.create(FormLayer.prototype);
+
+// TODO: These should ideally be consolidated in an "inputReceived" handler
+InstructionsMenu.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    if (pressed) {
+        Radius.popLayer();
+    }
+};
+
+InstructionsMenu.prototype.keyPressed = function (key, pressed) {
+    if (pressed) {
+        Radius.popLayer();
+    }
+};
+
 function MainMenu() {
     this.gameLayer = new GameLayer();
 
@@ -740,16 +777,21 @@ function MainMenu() {
         Radius.setFullscreen(text === fullscreenOptions[1]);
     });
 
-    FormLayer.call(this, new NestedFlowForm(1, [
-        new NestedFlowForm(3, [
+    var instructionsMenu = new InstructionsMenu();
+    FormLayer.call(this, new NestedGridForm(1, [
+        new NestedCenterFlowForm(3, [
             new Title('Avoision'),
             new Label('  '),
             new Logo()
-            ]),
-        new Separator(),
-        new Button('Start New Game', function () { mainMenu.startNewGame(); }),
-        difficultyChoice,
-        fullscreenChoice
+        ]),
+        new NestedFlowForm(1, [
+            new Separator(),
+            new Button('Start New Game', function () { mainMenu.startNewGame(); }),
+            difficultyChoice,
+            fullscreenChoice,
+            new Separator(),
+            new Button('Learn How to Play', function () { Radius.pushLayer(instructionsMenu); })
+        ])
     ]));
 }
 

@@ -126,6 +126,12 @@ Layer.prototype = {
         var now = Date.now();
         if (this.lastUpdate !== undefined && this.lastUpdate < now) {
             var ms = now - this.lastUpdate;
+
+            // Enforce a maximum period (50 ms) to handle e.g. switching to another tab (which may suspend the animation frames for this tab)
+            if (ms > 100) {
+                ms = 50;
+            }
+
             this.forEachEntity(function (entity) {
                 if (entity.update) {
                     entity.update(ms);
@@ -649,7 +655,6 @@ var Radius = new function () {
             });
 
             // Update entities and draw everything
-            // TODO: How to deal with really long delays between animation frames? Just override the value of ms (i.e. pretend it didn't happen)? Auto-pause?
             activeLayer.update();
             activeLayer.draw(canvas, context);
 

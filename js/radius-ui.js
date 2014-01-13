@@ -1,14 +1,15 @@
 ﻿/// <reference path="radius.js" />
 
-function Label(text, alignment, textHeight, font) {
+function Label(text, alignment, textHeight, font, verticalPadding) {
     Entity.apply(this);
     this.alignment = alignment || 'left';
     this.elements = [this.textElement = new Text('', font || Label.font, undefined, undefined, this.alignment)];
     this.totalHeight = textHeight || Label.textHeight;
+    this.verticalPadding = (verticalPadding !== undefined ? verticalPadding : this.totalHeight * 0.3);
     this.setText(text);
 }
 
-Label.textHeight = 24;
+Label.textHeight = 36;
 Label.font = Label.textHeight + 'px sans-serif';
 Label.prototype = Object.create(Entity.prototype);
 Label.alignmentToSetX = {
@@ -49,7 +50,7 @@ Label.prototype.setPosition = function (x, y) {
     this.componentY = y;
     var setX = Label.alignmentToSetX[this.alignment];
     setX.call(this, x);
-    this.y = y - this.totalHeight;
+    this.y = y - this.totalHeight + this.verticalPadding / 2;
 };
 
 Label.prototype.getActive = function () {
@@ -57,7 +58,7 @@ Label.prototype.getActive = function () {
 };
 
 Label.prototype.getMinimumSize = function () {
-    return [this.textElement.getTotalWidth(), this.totalHeight];
+    return [this.textElement.getTotalWidth(), this.totalHeight + this.verticalPadding];
 };
 
 Label.prototype.getDesiredSize = function () {
@@ -65,7 +66,7 @@ Label.prototype.getDesiredSize = function () {
 };
 
 Label.prototype.getSize = function () {
-    return [this.totalWidth, this.totalHeight];
+    return [this.totalWidth, this.totalHeight + this.verticalPadding];
 };
 
 Label.prototype.setSize = function (width, height) {
@@ -86,10 +87,10 @@ function Separator() {
 Separator.prototype = Object.create(Label.prototype);
 
 function Title(text) {
-    Label.call(this, text, 'center', Title.textHeight, Title.font);
+    Label.call(this, text, 'center', Title.textHeight, Title.font, 0);
 }
 
-Title.textHeight = 48;
+Title.textHeight = Label.textHeight * 1.8;
 Title.font = Title.textHeight + 'px sans-serif';
 Title.prototype = Object.create(Label.prototype);
 
@@ -144,6 +145,9 @@ function Form(x, y, desiredWidth, desiredHeight, layout, components) {
         right: Form.prototype.moveRight,
         enter: Form.prototype.activate
     };
+
+    this.mouseButtonPressedHandlers = {};
+    this.mouseButtonPressedHandlers[MouseButton.primary] = Form.prototype.activate;
 }
 
 Form.defaultX = -200;
@@ -311,29 +315,51 @@ Form.prototype = {
         return intersectingComponent;
     },
 
-    mouseMoved: function (x, y) {
-        var handled = false;
+    mouseMovedOrPressed: function (processingPress, button, pressed, x, y) {
+        // Handle the move first
         var component = this.getComponentAtPosition(x, y);
+        var moveHandled = false;
         if (component) {
             if (this.focusedNode !== component) {
                 this.changeFocus(component);
             }
 
             if (component.mouseMoved) {
-                handled = component.mouseMoved(x, y);
+                moveHandled = component.mouseMoved(x, y);
             }
         }
 
-        return handled;
+        // Now handle the press
+        var pressHandled = false;
+        if (processingPress) {
+            if (component) {
+                // Check for button press event handler
+                if (component.mouseButtonPressed) {
+                    pressHandled = component.mouseButtonPressed(button, pressed, x, y);
+                }
+
+                if (!pressHandled) {
+                    // No button press handler, so the form will handle this
+                    var handler = this.mouseButtonPressedHandlers[button];
+                    if (handler) {
+                        if (pressed) {
+                            pressHandled = handler.call(this, button, pressed, x, y);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Only mark as handled if the triggering event type was handled
+        return (processingPress && pressHandled) || (!processingPress && moveHandled);
+    },
+
+    mouseMoved: function (x, y) {
+        return this.mouseMovedOrPressed(false, null, null, x, y);
     },
 
     mouseButtonPressed: function (button, pressed, x, y) {
-        // TODO: This is kind of a hack...
-        // Move first
-        this.mouseMoved(x, y);
-
-        // Now handle the press as though enter were pressed...
-        return this.keyPressed('enter', pressed);
+        return this.mouseMovedOrPressed(true, button, pressed, x, y);
     },
 
     add: function (component) {
@@ -420,11 +446,12 @@ Form.prototype = {
     // TODO: Nested focus/unfocus
 };
 
-var columnLayout = function (columns, pad, columnWidths) {
-    // Determine minimum column widths and row heights
+var columnLayout = function (columns, pad, columnWidths, alignment) {
+    // Determine minimum column widths, row minimum widths, and row heights
     var fixed = !!columnWidths;
 
     var rowHeights = [0];
+    var rowMinimumWidths = [0];
     var column;
     var row = 0;
 
@@ -442,6 +469,7 @@ var columnLayout = function (columns, pad, columnWidths) {
         var component = components[i];
         var minimumSize = component.getMinimumSize();
         rowHeights[row] = Math.max(rowHeights[row], minimumSize[1]);
+        rowMinimumWidths[row] += minimumSize[0];
 
         if (!fixed) {
             columnWidths[column] = Math.max(columnWidths[column], minimumSize[0]);
@@ -452,6 +480,7 @@ var columnLayout = function (columns, pad, columnWidths) {
         if (column === 0) {
             row++;
             rowHeights[row] = 0;
+            rowMinimumWidths[row] = 0;
         }
     }
 
@@ -497,7 +526,10 @@ var columnLayout = function (columns, pad, columnWidths) {
             column = 0;
             row++;
 
-            // TODO: Special case for centered flow layout
+            // Special case for centered flow layout
+            if (!pad && this.desiredWidth && alignment === 'center') {
+                x = this.x + this.desiredWidth / 2 - rowMinimumWidths[row] / 2;
+            }
         }
 
         var componentWidth = columnWidths[column];
@@ -528,7 +560,7 @@ function FlowForm(columns, x, y, desiredWidth, desiredHeight, components) {
 }
 
 FlowForm.layout = function () {
-    columnLayout.call(this, this.columns, false);
+    columnLayout.call(this, this.columns, false, undefined, this.alignment);
 };
 
 FlowForm.prototype = Object.create(Form.prototype);
@@ -538,6 +570,13 @@ function NestedFlowForm(columns, components) {
 }
 
 NestedFlowForm.prototype = Object.create(FlowForm.prototype);
+
+function NestedCenterFlowForm(columns, components) {
+    this.alignment = 'center';
+    FlowForm.call(this, columns, undefined, undefined, undefined, undefined, components);
+}
+
+NestedCenterFlowForm.prototype = Object.create(FlowForm.prototype);
 
 // Grid forms
 function GridForm(columns, x, y, desiredWidth, desiredHeight, components) {
@@ -593,6 +632,7 @@ function Choice(text, choices) {
     NestedFixedForm.call(this, [label.getMinimumSize()[0], leftArrow.getMinimumSize()[0], maxItemWidth, rightArrow.getMinimumSize()[0]], [label, leftArrow, itemComponent, rightArrow]);
 
     this.choices = choices;
+    this.label = label;
     this.leftArrow = leftArrow;
     this.itemComponent = itemComponent;
     this.rightArrow = rightArrow;
@@ -636,15 +676,63 @@ Choice.prototype.movedRight = function () {
     return true;
 };
 
+Choice.prototype.routePosition = function (x, y, left, right, neither, outside) {
+    // Check label
+    var lp = this.label.getPosition();
+    var ls = this.label.getSize();
+
+    if (x >= lp[0] && x <= lp[0] + ls[0] && y <= lp[1] && y >= lp[1] - ls[1]) {
+        // Targeted the label
+        neither();
+    } else {
+        // Check anywhere in the control
+        var p = this.getPosition();
+        var s = this.getSize();
+        if (x >= p[0] && x <= p[0] + s[0] && y <= p[1] && y >= p[1] - s[1]) {
+            // Check for arrows
+            var rap = this.rightArrow.getPosition();
+            var lap = this.leftArrow.getPosition();
+            var las = this.leftArrow.getSize();
+            if (x < (rap[0] - lap[0]) / 2 + lap[0] + las[0]) {
+                left();
+            } else {
+                right();
+            }
+        } else {
+            outside();
+        }
+    }
+};
+
+// Handle mouse button presses specially so that the left/right arrow work as expected
+Choice.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    var handled = false;
+    if (button === MouseButton.primary && pressed) {
+        var newIndex;
+        var choice = this;
+        this.routePosition(x, y,
+            function () { newIndex = Math.max(0, choice.index - 1); },
+            function () { newIndex = Math.min(choice.choices.length - 1, choice.index + 1); },
+            function () { },
+            function () { }
+            );
+
+        if (newIndex !== undefined) {
+            handled = true;
+            if (newIndex !== this.index) {
+                this.setIndex(newIndex);
+            }
+        }
+    }
+    return handled;
+};
+
 Choice.prototype.activated = function () {
-    // TODO: Special case for mouse input somehow
     var newIndex = (this.index + 1) % this.choices.length;
     if (newIndex !== this.index) {
         this.setIndex(newIndex);
     }
 };
-
-// TODO: routePosition, highlights, set/getActive, mouseMoved, focused/unfocused
 
 function FormLayer(form) {
     Layer.apply(this);
