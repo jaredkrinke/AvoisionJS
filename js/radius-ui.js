@@ -619,6 +619,7 @@ function Choice(text, choices) {
     NestedFixedForm.call(this, [label.getMinimumSize()[0], leftArrow.getMinimumSize()[0], maxItemWidth, rightArrow.getMinimumSize()[0]], [label, leftArrow, itemComponent, rightArrow]);
 
     this.choices = choices;
+    this.label = label;
     this.leftArrow = leftArrow;
     this.itemComponent = itemComponent;
     this.rightArrow = rightArrow;
@@ -662,15 +663,63 @@ Choice.prototype.movedRight = function () {
     return true;
 };
 
+Choice.prototype.routePosition = function (x, y, left, right, neither, outside) {
+    // Check label
+    var lp = this.label.getPosition();
+    var ls = this.label.getSize();
+
+    if (x >= lp[0] && x <= lp[0] + ls[0] && y <= lp[1] && y >= lp[1] - ls[1]) {
+        // Targeted the label
+        neither();
+    } else {
+        // Check anywhere in the control
+        var p = this.getPosition();
+        var s = this.getSize();
+        if (x >= p[0] && x <= p[0] + s[0] && y <= p[1] && y >= p[1] - s[1]) {
+            // Check for arrows
+            var rap = this.rightArrow.getPosition();
+            var lap = this.leftArrow.getPosition();
+            var las = this.leftArrow.getSize();
+            if (x < (rap[0] - lap[0]) / 2 + lap[0] + las[0]) {
+                left();
+            } else {
+                right();
+            }
+        } else {
+            outside();
+        }
+    }
+};
+
+// Handle mouse button presses specially so that the left/right arrow work as expected
+Choice.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    var handled = false;
+    if (button === MouseButton.primary && pressed) {
+        var newIndex;
+        var choice = this;
+        this.routePosition(x, y,
+            function () { newIndex = Math.max(0, choice.index - 1); },
+            function () { newIndex = Math.min(choice.choices.length - 1, choice.index + 1); },
+            function () { },
+            function () { }
+            );
+
+        if (newIndex !== undefined) {
+            handled = true;
+            if (newIndex !== this.index) {
+                this.setIndex(newIndex);
+            }
+        }
+    }
+    return handled;
+};
+
 Choice.prototype.activated = function () {
-    // TODO: Special case for mouse input somehow
     var newIndex = (this.index + 1) % this.choices.length;
     if (newIndex !== this.index) {
         this.setIndex(newIndex);
     }
 };
-
-// TODO: routePosition, highlights, set/getActive, mouseMoved, focused/unfocused
 
 function FormLayer(form) {
     Layer.apply(this);
