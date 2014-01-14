@@ -88,6 +88,18 @@ var Transform2D = {
     // TODO: Is invert needed?
 };
 
+function AudioClip(source) {
+    this.audio = document.createElement('audio');
+    this.audio.src = source;
+}
+
+AudioClip.prototype = {
+    constructor: AudioClip,
+    play: function () {
+        this.audio.play();
+    }
+}
+
 var keyCodeToName = {
     8: 'backspace',
     9: 'tab',

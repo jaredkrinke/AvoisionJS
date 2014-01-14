@@ -2,7 +2,8 @@
 Should hitting "escape" exit fullscreen mode by default?
 
 Finishing off 1.0:
-Sound
+UI/loss sound effects
+Option to disable sound
 High scores (including local persistence)
 High scores (include global persistence)
 Customizable controls?

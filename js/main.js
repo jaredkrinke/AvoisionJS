@@ -10,6 +10,7 @@ function MovingObject(x, y, width, height, vx, vy) {
 }
 
 MovingObject.prototype = Object.create(Entity.prototype);
+MovingObject.bounceClip = new AudioClip('sounds/bounce.mp3');
 
 MovingObject.prototype.updateAxis = function (ms, axis, axisSize) {
     var v = this.v[axis];
@@ -23,6 +24,7 @@ MovingObject.prototype.updateAxis = function (ms, axis, axisSize) {
         }
 
         this.v[axis] = -v;
+        MovingObject.bounceClip.play();
     }
 
     this[axis] = axisPosition;
