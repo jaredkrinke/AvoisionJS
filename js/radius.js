@@ -185,24 +185,30 @@ Layer.prototype = {
                         // Need to flip the coordinate system back so that text is rendered upright
                         context.scale(1, -1);
 
-                        if (element.color) {
-                            context.fillStyle = element.color;
-                        }
-
                         if (elementOpacity < 1) {
                             context.globalAlpha *= elementOpacity;
                         }
 
-                        if (element instanceof Rectangle) {
-                            context.fillRect(element.x, -element.y, element.width, element.height);
-                        } else if (element instanceof Text && element.text) {
-                            if (element.font) {
-                                context.font = element.font;
+                        if (element instanceof Image && element.loaded) {
+                            context.drawImage(element.img, element.x, -element.y, element.width, element.height);
+                        } else {
+                            // Color is only supported for text/shapes
+                            if (element.color) {
+                                context.fillStyle = element.color;
                             }
 
-                            context.textBaseline = element.baseline;
-                            context.textAlign = element.align;
-                            context.fillText(element.text, element.x, -element.y);
+                            if (element instanceof Text && element.text) {
+                                if (element.font) {
+                                    context.font = element.font;
+                                }
+
+                                context.textBaseline = element.baseline;
+                                context.textAlign = element.align;
+                                context.fillText(element.text, element.x, -element.y);
+                            } else {
+                                // Rectangle
+                                context.fillRect(element.x, -element.y, element.width, element.height);
+                            }
                         }
 
                         context.restore();
@@ -246,6 +252,24 @@ function Rectangle(x, y, width, height, color) {
     this.width = width || 1;
     this.height = height || 1;
     this.color = color;
+}
+
+function Image(source, color, x, y, width, height) {
+    this.x = (x !== undefined ? x : -0.5);
+    this.y = (y !== undefined ? y : 0.5);
+    this.width = width || 1;
+    this.height = height || 1;
+    this.color = color;
+    this.loaded = false;
+
+    // Load the image
+    this.img = document.createElement('img');
+    var image = this;
+    this.img.onload = function () {
+        image.loaded = true;
+    };
+
+    this.img.src = source;
 }
 
 function Text(text, font, x, y, align, baseline) {

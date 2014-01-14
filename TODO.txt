@@ -2,7 +2,6 @@
 Should hitting "escape" exit fullscreen mode by default?
 
 Finishing off 1.0:
-Images
 Sound
 High scores (including local persistence)
 High scores (include global persistence)
@@ -17,3 +16,5 @@ Beyond 1.0:
 Have a tutorial instead of a static instruction menu
 Optimize transformations
 Port to Windows 8?
+Cache images automatically and have specific loading phases
+Supply backup colors for images in one (data-driven) place

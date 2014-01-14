@@ -3,7 +3,6 @@
 
 function MovingObject(x, y, width, height, vx, vy) {
     Entity.call(this, x, y, width, height);
-    this.elements = [new Rectangle()];
     this.v = {
         x: vx,
         y: vy
@@ -36,16 +35,19 @@ MovingObject.prototype.update = function (ms) {
 
 function Enemy(x, y, width, height, vx, vy) {
     MovingObject.call(this, x, y, width, height, vx, vy);
+    this.elements = [Enemy.image];
 }
 
 Enemy.prototype = Object.create(MovingObject.prototype);
+Enemy.image = new Image('images/enemy.png', 'white');
 
 function Goal() {
     MovingObject.call(this, 0 ,0, Board.enemyWidth, Board.enemyWidth, 0, 0);
-    this.color = 'red';
+    this.elements = [Goal.image];
 }
 
 Goal.prototype = Object.create(MovingObject.prototype);
+Goal.image = new Image('images/goal.png', 'red');
 
 Goal.prototype.createGhost = function () {
     return new Ghost(this, 500, 5);
@@ -53,16 +55,16 @@ Goal.prototype.createGhost = function () {
 
 function Player() {
     Entity.call(this);
-    this.color = 'green';
     this.v = [0, 0, 0, 0];
     this.target = [];
     this.speed = 0.6 / 1000;
     this.width = 1 / 30;
     this.height = 1 / 30;
-    this.elements = [new Rectangle()];
+    this.elements = [Player.image];
 }
 
 Player.prototype = Object.create(Entity.prototype);
+Player.image = new Image('images/player.png', 'green');
 Player.prototype.setMovingUpState = function (pressed) {
     this.v[0] = pressed ? 1 : 0;
 };
@@ -149,8 +151,7 @@ Player.prototype.update = function (ms) {
 
 function Board(x, y, width, height) {
     Entity.call(this, x, y, width, height);
-    this.color = 'blue';
-    this.elements = [new Rectangle()];
+    this.elements = [Board.image];
 
     this.paused = false;
     this.difficulty = Difficulty.nameToLevel.Easy;
@@ -165,6 +166,7 @@ function Board(x, y, width, height) {
     this.completed = new Event();
 }
 
+Board.image = new Image('images/background.jpg', 'blue');
 Board.pointProgression = [30, 20, 15, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 Board.timeout = 19000;
 Board.transitionPeriod = 1000;
@@ -427,6 +429,8 @@ function Display(board) {
     this.font = font;
     this.textHeight = textHeight;
     this.scoreLabel = scoreLabel;
+
+    this.image = new Image('images/score.png', 'blue');
 }
 
 Display.prototype = Object.create(Entity.prototype);
@@ -435,8 +439,11 @@ Display.prototype.emphasizeScore = function () {
     var content = this.scoreLabel.text + this.scoreDisplay.textElement.text;
     var textElement = new Text(content, this.font, 0, 0, 'left', 'middle');
     var textWidth = textElement.getTotalWidth();
-    var background = new Rectangle(-this.textHeight / 2, this.textHeight / 2, textWidth + this.textHeight, this.textHeight);
-    background.color = 'blue';
+    var background = this.image;
+    background.x = -this.textHeight / 2;
+    background.y = this.textHeight / 2;
+    background.width = textWidth + this.textHeight;
+    background.height = this.textHeight;
     background.opacity = 0.85;
     var scaleMax = 2;
     this.children.push(this.bigScore = new ScriptedEntity([background, textElement],
@@ -663,25 +670,24 @@ function Logo() {
     var chasePeriod = 3000;
 
     var background = new Entity(0.5, -0.5, 0.95, 0.95);
-    background.elements = [new Rectangle()];
-    background.color = 'blue';
+    background.elements = [Board.image];
     this.children = [
         background,
-        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'green')], [
+        new ScriptedEntity([Player.image], [
             [0, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
         ], true),
-        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'red')], [
+        new ScriptedEntity([Goal.image], [
             [0, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
         ], true),
-        new ScriptedEntity([new Rectangle(undefined, undefined, undefined, undefined, 'white')], [
+        new ScriptedEntity([Enemy.image], [
             [0, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
