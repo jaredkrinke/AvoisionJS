@@ -89,14 +89,51 @@ var Transform2D = {
 };
 
 function AudioClip(source) {
-    this.audio = document.createElement('audio');
-    this.audio.src = source;
+    this.instances = [];
+    this.source = source;
+
+    // Cache the clip immediately
+    this.addInstance();
 }
 
+AudioClip.maxInstances = 4;
 AudioClip.prototype = {
     constructor: AudioClip,
+
+    addInstance: function () {
+        var audio = document.createElement('audio');
+        audio.src = this.source;
+        this.instances.push({
+            audio: audio,
+            endTimestamp: 0
+        });
+    },
+
     play: function () {
-        this.audio.play();
+        // Find an inactive instance
+        var count = this.instances.length;
+        var index = -1;
+        var now = Date.now();
+        for (var i = 0; i < count; i++) {
+            var instance = this.instances[i];
+            if (instance.endTimestamp < now) {
+                index = i;
+                break;
+            }
+        }
+
+        // Add a new instance, if necessary
+        if (index === -1 && count < AudioClip.maxInstances) {
+            this.addInstance();
+            index = this.instances.length - 1;
+        }
+
+        // Play
+        if (index >= 0) {
+            var instance = this.instances[index];
+            instance.audio.play();
+            instance.endTimestamp = now + instance.audio.duration * 1000;
+        }
     }
 }
 
