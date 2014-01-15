@@ -99,12 +99,18 @@ function Button(text, activated) {
     Label.call(this, text);
     this.active = true;
     this.textElement.color = Button.defaultColor;
-    this.activated = activated;
+
+    var button = this;
+    this.activated = function () {
+        activated.call(button);
+        Button.activatedClip.play();
+    }
 }
 
 Button.defaultColor = 'white';
 Button.focusedColor = 'blue';
 Button.disabledColor = 'gray';
+Button.activatedClip = new AudioClip('sounds/select.mp3');
 Button.prototype = Object.create(Label.prototype);
 
 Button.prototype.setActive = function (active) {
@@ -640,6 +646,7 @@ function Choice(text, choices) {
     this.choice = choices[0];
     // TODO: Colors
 
+    this.first = true;
     this.setIndex(0);
 }
 
@@ -656,6 +663,12 @@ Choice.prototype.setIndex = function (index) {
 
     // Notify
     this.choiceChanged.fire(this.choice);
+
+    // Play a sound
+    if (!this.first) {
+        Button.activatedClip.play();
+    }
+    this.first = false;
 };
 
 // TODO: select, getChoice

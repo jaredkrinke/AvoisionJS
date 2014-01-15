@@ -50,6 +50,7 @@ function Goal() {
 
 Goal.prototype = Object.create(MovingObject.prototype);
 Goal.image = new Image('images/goal.png', 'red');
+Goal.clip = new AudioClip('sounds/score.mp3');
 
 Goal.prototype.createGhost = function () {
     return new Ghost(this, 500, 5);
@@ -180,6 +181,7 @@ Board.enemySpeedMin = 0.1 / 1000;
 Board.enemySpeedMax = 0.6 / 1000;
 Board.goalSpeed = 0.1 / 1000;
 Board.goalDirectionPeriod = 3000;
+Board.loseClip = new AudioClip('sounds/boom.mp3');
 
 Board.prototype = Object.create(Entity.prototype);
 
@@ -303,6 +305,7 @@ Board.prototype.addEnemy = function () {
 };
 
 Board.prototype.lose = function () {
+    Board.loseClip.play();
     this.player.clearMovingStates();
     this.children.push(this.player.createGhost());
     this.removeChild(this.player);
@@ -312,6 +315,7 @@ Board.prototype.lose = function () {
 }
 
 Board.prototype.captureGoal = function () {
+    Goal.clip.play();
     this.setScore(this.score + this.points);
     this.children.push(this.goal.createGhost());
     this.resetGoal();
