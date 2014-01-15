@@ -88,12 +88,18 @@ var Transform2D = {
     // TODO: Is invert needed?
 };
 
+Audio = {
+    muted: false
+};
+
 function AudioClip(source) {
     this.instances = [];
     this.source = source;
 
     // Cache the clip immediately
-    this.addInstance();
+    if (!Audio.muted) {
+        this.addInstance();
+    }
 }
 
 AudioClip.maxInstances = 4;
@@ -110,29 +116,31 @@ AudioClip.prototype = {
     },
 
     play: function () {
-        // Find an inactive instance
-        var count = this.instances.length;
-        var index = -1;
-        var now = Date.now();
-        for (var i = 0; i < count; i++) {
-            var instance = this.instances[i];
-            if (instance.endTimestamp < now) {
-                index = i;
-                break;
+        if (!Audio.muted) {
+            // Find an inactive instance
+            var count = this.instances.length;
+            var index = -1;
+            var now = Date.now();
+            for (var i = 0; i < count; i++) {
+                var instance = this.instances[i];
+                if (instance.endTimestamp < now) {
+                    index = i;
+                    break;
+                }
             }
-        }
 
-        // Add a new instance, if necessary
-        if (index === -1 && count < AudioClip.maxInstances) {
-            this.addInstance();
-            index = this.instances.length - 1;
-        }
+            // Add a new instance, if necessary
+            if (index === -1 && count < AudioClip.maxInstances) {
+                this.addInstance();
+                index = this.instances.length - 1;
+            }
 
-        // Play
-        if (index >= 0) {
-            var instance = this.instances[index];
-            instance.audio.play();
-            instance.endTimestamp = now + instance.audio.duration * 1000;
+            // Play
+            if (index >= 0) {
+                var instance = this.instances[index];
+                instance.audio.play();
+                instance.endTimestamp = now + instance.audio.duration * 1000;
+            }
         }
     }
 }

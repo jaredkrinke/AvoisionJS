@@ -785,6 +785,12 @@ function MainMenu() {
         Radius.setFullscreen(text === fullscreenOptions[1]);
     });
 
+    var audioOptions = ['On', 'Muted'];
+    var audioChoice = new Choice('Audio', audioOptions);
+    audioChoice.choiceChanged.addListener(function (text) {
+        Audio.muted = (text === audioOptions[1]);
+    });
+
     var instructionsMenu = new InstructionsMenu();
     FormLayer.call(this, new NestedGridForm(1, [
         new NestedCenterFlowForm(3, [
@@ -797,6 +803,7 @@ function MainMenu() {
             new Button('Start New Game', function () { mainMenu.startNewGame(); }),
             difficultyChoice,
             fullscreenChoice,
+            audioChoice,
             new Separator(),
             new Button('Learn How to Play', function () { Radius.pushLayer(instructionsMenu); })
         ])
