@@ -272,8 +272,13 @@ Form.prototype = {
     activate: function () {
         var handled = false;
         if (this.focusedNode && this.focusedNode.activated) {
-            this.focusedNode.activated();
-            handled = true;
+            if (this.activated) {
+                this.activated();
+                handled = true;
+            } else if (this.focusedNode.activated) {
+                this.focusedNode.activated();
+                handled = true;
+            }
         }
 
         return handled;
