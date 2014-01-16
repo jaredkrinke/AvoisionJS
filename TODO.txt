@@ -1,6 +1,6 @@
 ﻿Bugs:
 Should hitting "escape" exit fullscreen mode by default?
-In IE, sound effects (after the first play) are truncated noticeably
+Hitting enter on a choice control does nothing but play a sound
 
 Finishing off 1.0:
 High scores (including local persistence)

@@ -92,9 +92,12 @@ Audio = {
     muted: false
 };
 
-function AudioClip(source) {
+function AudioClip(source, frequent) {
+    // Note: Internet Explorer 11 on Windows 7 seems to truncate MP3s that are less than 0.4s long, so make sure all
+    // clips are longer than this...
     this.instances = [];
     this.source = source;
+    this.frequent = frequent;
 
     // Cache the clip immediately
     if (!Audio.muted) {
@@ -108,10 +111,14 @@ AudioClip.prototype = {
 
     addInstance: function () {
         var audio = document.createElement('audio');
+
+        // Mark as preload = 'auto' so that the whole clip is cached and there is no buffering
+        audio.preload = 'auto';
         audio.src = this.source;
+
         this.instances.push({
             audio: audio,
-            endTimestamp: 0
+            played: false
         });
     },
 
@@ -123,23 +130,28 @@ AudioClip.prototype = {
             var now = Date.now();
             for (var i = 0; i < count; i++) {
                 var instance = this.instances[i];
-                if (instance.endTimestamp < now) {
+                if (!instance.played || instance.audio.ended) {
                     index = i;
                     break;
                 }
             }
 
-            // Add a new instance, if necessary
+            // Add a new instance, if none are available
             if (index === -1 && count < AudioClip.maxInstances) {
                 this.addInstance();
                 index = this.instances.length - 1;
             }
 
+            // If this clip is expected to occur frequently and we're on the last available instance, aggressively preload another instance
+            if (this.frequent && index === this.instances.length - 1 && this.instances.length < AudioClip.maxInstances) {
+                this.addInstance();
+            }
+
             // Play
             if (index >= 0) {
                 var instance = this.instances[index];
+                instance.played = true;
                 instance.audio.play();
-                instance.endTimestamp = now + instance.audio.duration * 1000;
             }
         }
     }

@@ -10,7 +10,7 @@ function MovingObject(x, y, width, height, vx, vy) {
 }
 
 MovingObject.prototype = Object.create(Entity.prototype);
-MovingObject.bounceClip = new AudioClip('sounds/bounce.mp3');
+MovingObject.bounceClip = new AudioClip('sounds/bounce.mp3', true);
 
 MovingObject.prototype.updateAxis = function (ms, axis, axisSize) {
     var v = this.v[axis];
