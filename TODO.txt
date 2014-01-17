@@ -1,4 +1,5 @@
 ﻿Bugs:
+Persist full screen and audio settings?
 
 Finishing off 1.0:
 Notify the user when a new high score is set (or maybe show it during gameplay as well)

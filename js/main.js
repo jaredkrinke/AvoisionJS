@@ -186,7 +186,6 @@ Board.loseClip = new AudioClip('sounds/boom.mp3');
 Board.prototype = Object.create(Entity.prototype);
 
 Board.prototype.resetGoal = function () {
-    // TODO: Difficulty
     var position = this.getSafePosition(this.goal.width, this.goal.height);
     this.goal.x = position[0];
     this.goal.y = position[1];
@@ -872,7 +871,6 @@ function MainMenu() {
 MainMenu.prototype = Object.create(FormLayer.prototype);
 
 MainMenu.prototype.startNewGame = function () {
-    // TODO: Instructions
     if (this.difficulty) {
         this.gameLayer.setDifficulty(this.difficulty);
     }
@@ -882,7 +880,6 @@ MainMenu.prototype.startNewGame = function () {
 };
 
 window.onload = function () {
-    // TODO: Consider automatic resizing (e.g. to fill the screen)
     Radius.initialize(document.getElementById('canvas'));
     Radius.start(new MainMenu());
 }
