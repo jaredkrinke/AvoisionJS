@@ -3,15 +3,15 @@ Persist full screen and audio settings?
 Show the current high score while a game is going on?
 
 Finishing off 1.0:
-High scores (include global persistence)
-Customizable controls?
 Improve the instructions (add images, maybe show them automatically on the first game)
 Option persistence
-Music?
 Go through TODOs in the code
 Launch on http://avsn.sf.net/
 
 Beyond 1.0:
+High scores (include global persistence)
+Customizable controls?
+Music?
 Have a tutorial instead of a static instruction menu
 Optimize transformations
 Port to Windows 8?

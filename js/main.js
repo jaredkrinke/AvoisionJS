@@ -590,7 +590,6 @@ function GameLayer() {
         if (score > HighScores.get(difficulty)) {
             newHighScore = true;
             HighScores.set(difficulty, score);
-            // TODO: Inform the player that they got a high score
         }
 
         display.emphasizeScore(newHighScore);
