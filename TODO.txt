@@ -1,8 +1,8 @@
 ﻿Bugs:
 Persist full screen and audio settings?
+Show the current high score while a game is going on?
 
 Finishing off 1.0:
-Notify the user when a new high score is set (or maybe show it during gameplay as well)
 High scores (include global persistence)
 Customizable controls?
 Improve the instructions (add images, maybe show them automatically on the first game)

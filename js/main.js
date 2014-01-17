@@ -436,11 +436,25 @@ function Display(board) {
     this.scoreLabel = scoreLabel;
 
     this.image = new Image('images/score.png', 'blue');
+
+    // High score emphasis
+    var textElement = new Text('New High Score!', this.font, 0, 0, 'center', 'middle');
+    var textWidth = textElement.getTotalWidth();
+    var background = new Image('images/score.png', 'blue', -textWidth / 2 - this.textHeight / 2, this.textHeight / 2, textWidth + this.textHeight, this.textHeight);
+    background.opacity = 0.85;
+    this.highScoreEmphasis = new Entity(board.x, board.y - this.textHeight * 2, 1, 1);
+    this.highScoreEmphasis.elements = [background, textElement];
+    this.children.push(this.highScoreEmphasis);
 }
 
 Display.prototype = Object.create(Entity.prototype);
 
-Display.prototype.emphasizeScore = function () {
+Display.prototype.emphasizeHighScore = function () {
+    Goal.clip.play();
+    this.highScoreEmphasis.opacity = 1;
+};
+
+Display.prototype.emphasizeScore = function (newHighScore) {
     var content = this.scoreLabel.text + this.scoreDisplay.textElement.text;
     var textElement = new Text(content, this.font, 0, 0, 'left', 'middle');
     var textWidth = textElement.getTotalWidth();
@@ -450,15 +464,21 @@ Display.prototype.emphasizeScore = function () {
     background.width = textWidth + this.textHeight;
     background.height = this.textHeight;
     background.opacity = 0.85;
-    var scaleMax = 2;
+    var scaleMax = 2
+    var display = this;
+    var ended = newHighScore ? function () { display.emphasizeHighScore(); } : undefined;
+
     this.children.push(this.bigScore = new ScriptedEntity([background, textElement],
         [[0, this.board.x - this.board.width / 2 + this.textHeight / 2, this.board.height / 2, 1, 1, 0, 1],
-         [1000, this.board.x - textWidth * scaleMax / 2, this.board.y, scaleMax, scaleMax, 0, 1]]));
+         [1000, this.board.x - textWidth * scaleMax / 2, this.board.y, scaleMax, scaleMax, 0, 1]],
+         false,
+         ended));
 };
 
 Display.prototype.reset = function () {
     // TODO: Suppress effects?
     // TODO: There is some weird flashing when switching to a second game...
+    this.highScoreEmphasis.opacity = 0;
     if (this.bigScore) {
         this.removeChild(this.bigScore);
         this.bigScore = null;
@@ -566,12 +586,14 @@ function GameLayer() {
 
     var display = this.display;
     this.board.lost.addListener(function (difficulty, score) {
-        display.emphasizeScore();
-
+        var newHighScore = false;
         if (score > HighScores.get(difficulty)) {
+            newHighScore = true;
             HighScores.set(difficulty, score);
             // TODO: Inform the player that they got a high score
         }
+
+        display.emphasizeScore(newHighScore);
     });
 
     this.board.completed.addListener(function () {
