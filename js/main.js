@@ -311,7 +311,7 @@ Board.prototype.lose = function () {
     this.removeChild(this.player);
     this.paused = true;
     this.finishTimer = this.timer + Board.transitionPeriod;
-    this.lost.fire();
+    this.lost.fire(this.difficulty, this.score);
 }
 
 Board.prototype.captureGoal = function () {
@@ -566,8 +566,13 @@ function GameLayer() {
     this.board.reset();
 
     var display = this.display;
-    this.board.lost.addListener(function () {
+    this.board.lost.addListener(function (difficulty, score) {
         display.emphasizeScore();
+
+        if (score > HighScores.get(difficulty)) {
+            HighScores.set(difficulty, score);
+            // TODO: Inform the player that they got a high score
+        }
     });
 
     this.board.completed.addListener(function () {
@@ -737,10 +742,29 @@ Logo.prototype.setSize = function (width, height) {
     this.height = this.desiredHeight;
 };
 
+function StaticMenu(form) {
+    FormLayer.call(this, form);
+}
+
+StaticMenu.prototype = Object.create(FormLayer.prototype);
+
+// TODO: These should ideally be consolidated in an "inputReceived" handler
+StaticMenu.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    if (pressed) {
+        Radius.popLayer();
+    }
+};
+
+StaticMenu.prototype.keyPressed = function (key, pressed) {
+    if (pressed) {
+        Radius.popLayer();
+    }
+};
+
 function InstructionsMenu() {
     var textHeight = 18;
     var font = '18px sans-serif';
-    FormLayer.call(this, new NestedGridForm(1, [
+    StaticMenu.call(this, new NestedGridForm(1, [
         new Title('How to Play'),
         new NestedFlowForm(1, [
             new Label('', null, textHeight, font),
@@ -759,18 +783,47 @@ function InstructionsMenu() {
     ]));
 }
 
-InstructionsMenu.prototype = Object.create(FormLayer.prototype);
+InstructionsMenu.prototype = Object.create(StaticMenu.prototype);
 
-// TODO: These should ideally be consolidated in an "inputReceived" handler
-InstructionsMenu.prototype.mouseButtonPressed = function (button, pressed, x, y) {
-    if (pressed) {
-        Radius.popLayer();
+HighScores = {
+    constructKey: function (level) {
+        return 'highScore' + Difficulty.levelToName[level];
+    },
+
+    get: function (level) {
+        return parseInt(localStorage[HighScores.constructKey(level)]) || 0;
+    },
+
+    set: function (level, score) {
+        localStorage[HighScores.constructKey(level)] = score;
     }
 };
 
-InstructionsMenu.prototype.keyPressed = function (key, pressed) {
-    if (pressed) {
-        Radius.popLayer();
+function HighScoresMenu() {
+    var controls = [];
+    this.labels = [];
+    var difficultyLevelCount = Difficulty.levelToName.length;
+    for (var i = 0; i < difficultyLevelCount; i++) {
+        var name = Difficulty.levelToName[i];
+        controls.push(new Label(name + ': '));
+        this.labels[i] = new Label('', 'right');
+        controls.push(this.labels[i]);
+    }
+
+    StaticMenu.call(this, new NestedGridForm(1, [
+        new Title('High Scores'),
+        new Separator(),
+        new NestedGridForm(2, controls)
+    ]));
+}
+
+HighScoresMenu.prototype = Object.create(StaticMenu.prototype);
+
+HighScoresMenu.prototype.formShown = function () {
+    // Update all the scores
+    var count = this.labels.length;
+    for (var i = 0; i < count; i++) {
+        this.labels[i].setText('' + HighScores.get(i));
     }
 };
 
@@ -795,6 +848,7 @@ function MainMenu() {
         Audio.muted = (text === audioOptions[1]);
     });
 
+    var highScoresMenu = new HighScoresMenu();
     var instructionsMenu = new InstructionsMenu();
     FormLayer.call(this, new NestedGridForm(1, [
         new NestedCenterFlowForm(3, [
@@ -809,6 +863,7 @@ function MainMenu() {
             fullscreenChoice,
             audioChoice,
             new Separator(),
+            new Button('Show High Scores', function () { Radius.pushLayer(highScoresMenu); }),
             new Button('Learn How to Play', function () { Radius.pushLayer(instructionsMenu); })
         ])
     ]));

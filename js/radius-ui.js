@@ -767,6 +767,9 @@ FormLayer.prototype.show = function () {
 
 FormLayer.prototype.shown = function () {
     // TODO: Update selected item based on mouse
+    if (this.formShown) {
+        this.formShown();
+    }
 };
 
 FormLayer.prototype.keyPressed = function (key, pressed) {
