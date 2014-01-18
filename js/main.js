@@ -591,6 +591,10 @@ Tutorial.prototype = {
 
     reset: function () {
         this.setIndex(0);
+    },
+
+    cancel: function () {
+        this.setIndex(this.steps.length);
     }
 };
 
@@ -628,15 +632,20 @@ function GameLayer() {
 
     var tutorialTextHeight = (480 - this.board.height) / 4;
     var tutorialDisplay = this.addEntity(new Entity(0, -236));
+    this.tutorialDisplay = tutorialDisplay;
     var tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'center');
     tutorialDisplay.elements = [tutorialText];
     this.tutorial = new Tutorial([
-        [this.started,              function () { tutorialText.text = 'Move the green square (using arrow keys, mouse, or touch)'; }],
+        [this.started, function () {
+            tutorialDisplay.opacity = 1;
+            gameLayer.addEntity(tutorialDisplay);
+            tutorialText.text = 'Move the green square (using arrow keys, mouse, or touch)';
+        }],
         [this.moved,                function () { tutorialText.text = 'Score points by capturing the red square'; }],
         [this.board.scoreUpdated,   function () { tutorialText.text = 'Avoid the white squares!'; }],
         [this.board.scoreUpdated,   function () { }],
         [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated,   function () { tutorialText.text = ''; }]
+        [this.board.scoreUpdated,   function () { tutorialDisplay.opacity = 0; }]
     ]);
 
     var display = this.display;
@@ -728,8 +737,14 @@ GameLayer.prototype.setDifficulty = function (difficulty) {
     this.board.setDifficulty(difficulty);
 };
 
-GameLayer.prototype.start = function () {
-    this.tutorial.reset();
+GameLayer.prototype.start = function (showTutorial) {
+    if (showTutorial) {
+        this.tutorial.reset();
+    } else {
+        this.tutorialDisplay.opacity = 0;
+        this.tutorial.cancel();
+    }
+
     this.started.fire();
     Radius.pushLayer(this);
 };
@@ -843,30 +858,6 @@ StaticMenu.prototype.keyPressed = function (key, pressed) {
     }
 };
 
-function InstructionsMenu() {
-    var textHeight = 18;
-    var font = '18px sans-serif';
-    StaticMenu.call(this, new NestedGridForm(1, [
-        new Title('How to Play'),
-        new NestedFlowForm(1, [
-            new Label('', null, textHeight, font),
-            new Label('', null, textHeight, font),
-            new Label('MOVE the green square using the arrow keys,', null, textHeight, '18px sans-serif'),
-            new Label('clicking/tapping on the game area,', null, textHeight, font),
-            new Label('or with the virtual joystick to the right of the game', null, textHeight, font),
-            new Label('', null, textHeight, font),
-            new Label('HIT the red square to score points', null, textHeight, font),
-            new Label('(the faster you get to it, the more points you score)', null, textHeight, font),
-            new Label('', null, textHeight, font),
-            new Label('AVOID the obstacles that appear', null, textHeight, font),
-            new Label('', null, textHeight, font),
-            new Label('COMPETE to get the highest score!', null, textHeight, font)
-        ])
-    ]));
-}
-
-InstructionsMenu.prototype = Object.create(StaticMenu.prototype);
-
 HighScores = {
     constructKey: function (level) {
         return 'highScore' + Difficulty.levelToName[level];
@@ -931,7 +922,7 @@ function MainMenu() {
     });
 
     var highScoresMenu = new HighScoresMenu();
-    var instructionsMenu = new InstructionsMenu();
+    this.tutorialShown = localStorage['tutorialShown'] === 'true';
     FormLayer.call(this, new NestedGridForm(1, [
         new NestedCenterFlowForm(3, [
             new Title('Avoision'),
@@ -940,26 +931,30 @@ function MainMenu() {
         ]),
         new NestedFlowForm(1, [
             new Separator(),
-            new Button('Start New Game', function () { mainMenu.startNewGame(); }),
+            new Button('Start New Game', function () { mainMenu.startNewGame(!mainMenu.tutorialShown); }),
             difficultyChoice,
             fullscreenChoice,
             audioChoice,
             new Separator(),
             new Button('Show High Scores', function () { Radius.pushLayer(highScoresMenu); }),
-            new Button('Learn How to Play', function () { Radius.pushLayer(instructionsMenu); })
+            new Button('Learn How to Play', function () { mainMenu.startNewGame(true); })
         ])
     ]));
 }
 
 MainMenu.prototype = Object.create(FormLayer.prototype);
 
-MainMenu.prototype.startNewGame = function () {
+MainMenu.prototype.startNewGame = function (showTutorial) {
     if (this.difficulty) {
         this.gameLayer.setDifficulty(this.difficulty);
     }
 
     this.gameLayer.reset();
-    this.gameLayer.start();
+    this.gameLayer.start(showTutorial);
+    if (showTutorial) {
+        this.tutorialShown = true;
+        localStorage['tutorialShown'] = true;
+    }
 };
 
 window.onload = function () {
