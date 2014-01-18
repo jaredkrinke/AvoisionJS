@@ -556,11 +556,41 @@ AdaptiveJoystick.prototype.mouseMoved = function (x, y) {
     }
 };
 
+function Tutorial(sequence) {
+    this.stepChanged = new Event();
+    this.index = 0;
+    var count = sequence.length;
+    // TODO: It would be more efficient to only add handlers as needed
+    for (var i = 0; i < count; i++) {
+        var tutorial = this;
+        (function (i) {
+            var step = sequence[i];
+            var event = step[0];
+            event.addListener(function () {
+                if (tutorial.index === i) {
+                    tutorial.stepChanged.fire.call(tutorial.stepChanged, step.slice(1));
+                    tutorial.index++;
+                }
+            });
+        })(i);
+    }
+}
+
+Tutorial.prototype = {
+    constructor: Tutorial,
+
+    reset: function () {
+        this.index = 0;
+    }
+};
+
 function GameLayer() {
     Layer.apply(this);
     this.done = false;
     this.board = this.addEntity(new Board(-110, 0, 400, 400));
     this.display = this.addEntity(new Display(this.board));
+    this.started = new Event();
+    this.moved = new Event();
 
     // Touch controls
     var gameLayer = this;
@@ -575,7 +605,9 @@ function GameLayer() {
         board.player.clearTarget();
     });
     this.touchJoystick.manipulationUpdated.addListener(function (angle) {
+        // TODO: Should this be "angle !== undefined? I think it should...
         if (angle) {
+            gameLayer.moved.fire();
             gameLayer.board.player.setTarget(bigDistance * Math.cos(angle), bigDistance * Math.sin(angle));
         } else {
             gameLayer.board.player.clearTarget();
@@ -583,6 +615,19 @@ function GameLayer() {
     });
 
     this.board.reset();
+
+    var tutorialTextHeight = (480 - this.board.height) / 4;
+    var tutorialDisplay = this.addEntity(new Entity(0, -236));
+    var tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'center');
+    tutorialDisplay.elements = [tutorialText];
+    this.tutorial = new Tutorial([
+        [this.started, 'Move the green square (using arrow keys, mouse, or touch)'],
+        [this.moved, 'Score points by capturing the red square'],
+        [this.board.scoreUpdated, 'Avoid the white squares!']
+        ]);
+    this.tutorial.stepChanged.addListener(function (text) {
+        tutorialText.text = text;
+    });
 
     var display = this.display;
     this.board.lost.addListener(function (difficulty, score) {
@@ -601,18 +646,22 @@ function GameLayer() {
 
     this.keyPressedHandlers = {
         left: function (pressed) {
+            gameLayer.moved.fire();
             board.player.setMovingLeftState(pressed);
         },
 
         right: function (pressed) {
+            gameLayer.moved.fire();
             board.player.setMovingRightState(pressed);
         },
 
         up: function (pressed) {
+            gameLayer.moved.fire();
             board.player.setMovingUpState(pressed);
         },
 
         down: function (pressed) {
+            gameLayer.moved.fire();
             board.player.setMovingDownState(pressed);
         },
 
@@ -638,6 +687,7 @@ function GameLayer() {
                     gameLayer.touchJoystick.mouseButtonPressed(button, pressed, x, y);
                 } else {
                     if (pressed) {
+                        gameLayer.moved.fire();
                         board.player.setTarget((x - board.x) / board.width, (y - board.y) / board.height);
                     } else {
                         board.player.clearTarget();
@@ -669,6 +719,8 @@ GameLayer.prototype.setDifficulty = function (difficulty) {
 };
 
 GameLayer.prototype.start = function () {
+    this.tutorial.reset();
+    this.started.fire();
     Radius.pushLayer(this);
 };
 
