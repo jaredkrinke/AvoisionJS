@@ -556,31 +556,41 @@ AdaptiveJoystick.prototype.mouseMoved = function (x, y) {
     }
 };
 
-function Tutorial(sequence) {
-    this.stepChanged = new Event();
-    this.index = 0;
-    var count = sequence.length;
-    // TODO: It would be more efficient to only add handlers as needed
-    for (var i = 0; i < count; i++) {
-        var tutorial = this;
-        (function (i) {
-            var step = sequence[i];
-            var event = step[0];
-            event.addListener(function () {
-                if (tutorial.index === i) {
-                    tutorial.stepChanged.fire.call(tutorial.stepChanged, step.slice(1));
-                    tutorial.index++;
-                }
-            });
-        })(i);
-    }
+function Tutorial(steps) {
+    this.steps = steps;
+    this.reset();
 }
 
 Tutorial.prototype = {
     constructor: Tutorial,
 
+    setIndex: function (index) {
+        // Remove listener for previous index
+        if (this.handler) {
+            this.step[0].removeListener(this.handler);
+        }
+
+        // Add listener for new index
+        if (index < this.steps.length) {
+            var tutorial = this;
+            var step = this.steps[index];
+            this.handler = function () {
+                // Setup next step
+                tutorial.setIndex(index + 1);
+
+                // Call the supplied callback
+                step[1].apply(null, arguments);
+            };
+
+            this.step = step;
+            step[0].addListener(this.handler);
+        } else {
+            this.handler = null;
+        }
+    },
+
     reset: function () {
-        this.index = 0;
+        this.setIndex(0);
     }
 };
 
@@ -621,13 +631,13 @@ function GameLayer() {
     var tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'center');
     tutorialDisplay.elements = [tutorialText];
     this.tutorial = new Tutorial([
-        [this.started, 'Move the green square (using arrow keys, mouse, or touch)'],
-        [this.moved, 'Score points by capturing the red square'],
-        [this.board.scoreUpdated, 'Avoid the white squares!']
-        ]);
-    this.tutorial.stepChanged.addListener(function (text) {
-        tutorialText.text = text;
-    });
+        [this.started,              function () { tutorialText.text = 'Move the green square (using arrow keys, mouse, or touch)'; }],
+        [this.moved,                function () { tutorialText.text = 'Score points by capturing the red square'; }],
+        [this.board.scoreUpdated,   function () { tutorialText.text = 'Avoid the white squares!'; }],
+        [this.board.scoreUpdated,   function () { }],
+        [this.board.scoreUpdated,   function () { }],
+        [this.board.scoreUpdated,   function () { tutorialText.text = ''; }]
+    ]);
 
     var display = this.display;
     this.board.lost.addListener(function (difficulty, score) {

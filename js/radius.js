@@ -1,5 +1,6 @@
 ﻿function Event() {
     this.callbacks = [];
+    this.locked = false;
 }
 
 Event.prototype = {
@@ -9,11 +10,44 @@ Event.prototype = {
         this.callbacks.push(callback);
     },
 
+    removeListener: function (callback) {
+        if (this.locked) {
+            // Queue the remove
+            if (this.pendingRemoval) {
+                this.pendingRemoval.push(callback);
+            } else {
+                this.pendingRemoval = [callback];
+            }
+        } else {
+            // Scan for the callback and remove it
+            for (var i = 0; i < this.callbacks.length; i++) {
+                if (this.callbacks[i] === callback) {
+                    this.callbacks.splice(i, 1);
+                    i--;
+                    break;
+                }
+            }
+        }
+    },
+
     fire: function () {
         var callbacks = this.callbacks;
         var length = callbacks.length;
+
+        // Lock the list of callbacks while iterating
+        this.locked = true;
         for (var i = 0; i < length; i++) {
             callbacks[i].apply(null, arguments);
+        }
+        this.locked = false;
+
+        if (this.pendingRemoval) {
+            // Process removes that occurred during iteration
+            length = this.pendingRemoval.length;
+            for (i = 0; i < length; i++) {
+                this.removeListener(this.pendingRemoval[i]);
+            }
+            this.pendingRemoval = null;
         }
     }
 };
@@ -230,7 +264,7 @@ Layer.prototype = {
 
     drawEntity: function (canvas, context, entity) {
         var opacity = (entity.opacity !== undefined ? entity.opacity : 1);
-        if (opacity > 0) {
+        if (opacity > 0 && (entity.elements || entity.children)) {
             context.save();
             context.translate(entity.x, entity.y);
 
