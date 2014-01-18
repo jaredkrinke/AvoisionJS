@@ -1,10 +1,8 @@
 ﻿Bugs:
-Persist full screen and audio settings?
 Show the current high score while a game is going on?
 
 Finishing off 1.0:
 Improve the instructions (add images, maybe show them automatically on the first game)
-Option persistence
 Go through TODOs in the code
 Launch on http://avsn.sf.net/
 

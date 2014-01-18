@@ -89,8 +89,16 @@ var Transform2D = {
 };
 
 Audio = {
-    muted: false
 };
+
+(function () {
+    var key = 'radiusAudioMuted';
+    Audio.muted = localStorage[key] === 'true';
+    Audio.setMuted = function (muted) {
+        localStorage[key] = muted;
+        Audio.muted = muted;
+    };
+})();
 
 function AudioClip(source, frequent) {
     // Note: Internet Explorer 11 on Windows 7 seems to truncate MP3s that are less than 0.4s long, so make sure all

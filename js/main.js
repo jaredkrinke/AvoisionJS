@@ -863,9 +863,9 @@ function MainMenu() {
     });
 
     var audioOptions = ['On', 'Muted'];
-    var audioChoice = new Choice('Audio', audioOptions);
+    var audioChoice = new Choice('Audio', audioOptions, Audio.muted ? 1 : 0);
     audioChoice.choiceChanged.addListener(function (text) {
-        Audio.muted = (text === audioOptions[1]);
+        Audio.setMuted(text === audioOptions[1]);
     });
 
     var highScoresMenu = new HighScoresMenu();
