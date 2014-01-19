@@ -308,14 +308,24 @@ Layer.prototype = {
                                 context.fillStyle = element.color;
                             }
 
-                            if (element instanceof Text && element.text) {
+                            if (element instanceof Text) {
                                 if (element.font) {
                                     context.font = element.font;
                                 }
 
                                 context.textBaseline = element.baseline;
                                 context.textAlign = element.align;
-                                context.fillText(element.text, element.x, -element.y);
+
+                                if (element.text) {
+                                    context.fillText(element.text, element.x, -element.y);
+                                } else if (element.lines) {
+                                    var lineCount = element.lines.length;
+                                    var offset = 0;
+                                    for (var l = 0; l < lineCount; l++) {
+                                        context.fillText(element.lines[l], element.x, -element.y + offset);
+                                        offset += element.lineHeight;
+                                    }
+                                }
                             } else {
                                 // Rectangle
                                 context.fillRect(element.x, -element.y, element.width, element.height);
@@ -383,13 +393,15 @@ function Image(source, color, x, y, width, height) {
     this.img.src = source;
 }
 
-function Text(text, font, x, y, align, baseline) {
+// TODO: Should this just take a height value instead of a font?
+function Text(text, font, x, y, align, baseline, lineHeight) {
     this.text = text;
     this.font = font;
     this.x = x || 0;
     this.y = y || 0;
     this.align = align || 'left';
     this.baseline = baseline || 'alphabetic';
+    this.lineHeight = lineHeight;
 }
 
 Text.prototype = {
@@ -829,5 +841,47 @@ var Radius = new function () {
         context.restore();
 
         return width;
+    }
+
+    this.wrapText = function (font, maxWidth, text) {
+        var lines = [];
+        var length = text.length;
+        var startIndex = 0;
+        var lastSeparator;
+        for (var i = 0; i <= length; i++) {
+            if (i === length || text[i] === ' ' || text[i] === '\n') {
+                if (i > startIndex) {
+                    var width = Radius.getTextWidth(font, text.slice(startIndex, i));
+                    if (width < maxWidth) {
+                        if (text[i] === '\n' || i === length) {
+                            lines.push(text.slice(startIndex, i));
+                            startIndex = i + 1;
+                        } else {
+                            // This line fit, so record this point in case we need to come back to it
+                            lastSeparator = i;
+                        }
+                    } else {
+                        // The line is too long, so go back to the previous separator
+                        if (lastSeparator) {
+                            lines.push(text.slice(startIndex, lastSeparator));
+                            startIndex = lastSeparator + 1;
+                            lastSeparator = null;
+
+                            // Now check this point again
+                            i--;
+                        } else {
+                            lines.push(text.slice(startIndex, i));
+                            startIndex = i + 1;
+                        }
+                    }
+                } else {
+                    startIndex = i + 1;
+                    if (text[i] === '\n') {
+                        lines.push('');
+                    }
+                }
+            }
+        }
+        return lines;
     }
 };

@@ -2,7 +2,7 @@
 Show the current high score while a game is going on?
 
 Finishing off 1.0:
-Improve the tutorial (easier to read, more detailed text, animations)
+Improve the tutorial (animations?)
 Go through TODOs in the code
 Launch on http://avsn.sf.net/
 

@@ -630,22 +630,28 @@ function GameLayer() {
 
     this.board.reset();
 
-    var tutorialTextHeight = (480 - this.board.height) / 4;
-    var tutorialDisplay = this.addEntity(new Entity(0, -236));
+    var tutorialPadding = 4;
+    var tutorialTextWidth = 320 - (this.board.x + (this.board.width / 2)) - tutorialPadding * 2;
+    var tutorialTextHeight = 24;
+    var tutorialDisplay = this.addEntity(new Entity(this.board.x + (this.board.width / 2) + tutorialPadding, 200 - tutorialTextHeight));
     this.tutorialDisplay = tutorialDisplay;
-    var tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'center');
+    var tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'left', undefined, tutorialTextHeight);
     tutorialDisplay.elements = [tutorialText];
+    var showTutorialText = function (text) { tutorialText.lines = Radius.wrapText(tutorialText.font, tutorialTextWidth, text) };
     this.tutorial = new Tutorial([
         [this.started, function () {
             tutorialDisplay.opacity = 1;
             gameLayer.addEntity(tutorialDisplay);
-            tutorialText.text = 'Move the green square (using arrow keys, mouse, or touch)';
+            showTutorialText('Move the green square using one of the following:\n\na) Arrow keys\n\nb) Clicking or pressing on the game board\n\nc) Using the touch joystick to the right of the game board.');
         }],
-        [this.moved,                function () { tutorialText.text = 'Score points by capturing the red square'; }],
-        [this.board.scoreUpdated,   function () { tutorialText.text = 'Avoid the white squares!'; }],
+        [this.moved,                function () { showTutorialText('Score points by capturing the red square.\n\nThe faster you capture it, the more points you score.'); }],
+        [this.board.scoreUpdated,   function () { showTutorialText('Avoid the white squares!\n\nIf you hit a white square, the game will end.'); }],
         [this.board.scoreUpdated,   function () { }],
         [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated,   function () { tutorialDisplay.opacity = 0; }]
+        [this.board.scoreUpdated,   function () { }],
+        [this.board.scoreUpdated,   function () { }],
+        [this.board.scoreUpdated,   function () { }],
+        [this.board.scoreUpdated, function () { tutorialDisplay.opacity = 0; }]
     ]);
 
     var display = this.display;
