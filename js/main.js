@@ -609,15 +609,67 @@ function TutorialDisplay(x, y, width) {
 }
 
 TutorialDisplay.prototype = Object.create(Entity.prototype);
+TutorialDisplay.displayPeriod = 2000;
+TutorialDisplay.fadePeriod = 500;
+TutorialDisplay.state = {
+    idle: 0,
+    fadingIn: 1,
+    fadingOut: 2,
+    waiting: 3
+};
+
+TutorialDisplay.prototype.clear = function () {
+    this.opacity = 0;
+    this.tutorialText.lines = null;
+    this.pendingLines = [];
+    this.state = TutorialDisplay.state.idle;
+}
 
 TutorialDisplay.prototype.setText = function (text) {
-    // TODO: Could/should these actually completely add/remove this entity?
-    if (text) {
-        this.tutorialText.lines = Radius.wrapText(this.tutorialText.font, this.tutorialTextWidth, text);
-        this.opacity = 1;
-    } else {
-        this.tutorialText.lines = null;
-        this.opacity = 0;
+    var lines = text ? Radius.wrapText(this.tutorialText.font, this.tutorialTextWidth, text) : null;
+    this.pendingLines.push(lines);
+};
+
+TutorialDisplay.prototype.update = function (ms) {
+    switch (this.state) {
+        case TutorialDisplay.state.fadingIn:
+            this.timer = Math.max(0, this.timer - ms);
+            this.opacity = (TutorialDisplay.fadePeriod - this.timer) / TutorialDisplay.fadePeriod;
+            if (this.timer === 0) {
+                this.pendingLines.splice(0, 1);
+                this.timer = TutorialDisplay.displayPeriod;
+                this.state = TutorialDisplay.state.waiting;
+            }
+            break;
+
+        case TutorialDisplay.state.fadingOut:
+            this.timer = Math.max(0, this.timer - ms);
+            this.opacity = this.timer / TutorialDisplay.fadePeriod;
+            if (this.timer === 0) {
+                this.tutorialText.lines = this.pendingLines[0];
+                this.timer = TutorialDisplay.fadePeriod;
+                this.state = TutorialDisplay.state.fadingIn;
+            }
+            break;
+
+        case TutorialDisplay.state.waiting:
+            this.timer = Math.max(0, this.timer - ms);
+            if (this.timer === 0) {
+                this.state = TutorialDisplay.state.idle;
+            }
+            break;
+
+        default:
+            if (this.pendingLines.length > 0) {
+                this.timer = TutorialDisplay.fadePeriod;
+                if (this.tutorialText.lines) {
+                    this.state = TutorialDisplay.state.fadingOut;
+                } else {
+                    this.tutorialText.lines = this.pendingLines[0];
+                    this.state = TutorialDisplay.state.fadingIn;
+                }
+            }
+            break;
     }
 };
 
@@ -757,7 +809,8 @@ GameLayer.prototype.setDifficulty = function (difficulty) {
 };
 
 GameLayer.prototype.start = function (showTutorial) {
-    this.tutorialDisplay.setText(null);
+    // TODO: Only add the entity if there's going to be a tutorial
+    this.tutorialDisplay.clear();
     if (showTutorial) {
         this.tutorial.reset();
     } else {
