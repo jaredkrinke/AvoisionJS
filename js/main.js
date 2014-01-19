@@ -598,6 +598,29 @@ Tutorial.prototype = {
     }
 };
 
+function TutorialDisplay(x, y, width) {
+    var tutorialPadding = 4;
+    var tutorialTextHeight = 24;
+    this.tutorialTextWidth = width - tutorialPadding * 2;
+    Entity.call(this, x + tutorialPadding, y - tutorialTextHeight);
+
+    this.tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'left', undefined, tutorialTextHeight);
+    this.elements = [this.tutorialText];
+}
+
+TutorialDisplay.prototype = Object.create(Entity.prototype);
+
+TutorialDisplay.prototype.setText = function (text) {
+    // TODO: Could/should these actually completely add/remove this entity?
+    if (text) {
+        this.tutorialText.lines = Radius.wrapText(this.tutorialText.font, this.tutorialTextWidth, text);
+        this.opacity = 1;
+    } else {
+        this.tutorialText.lines = null;
+        this.opacity = 0;
+    }
+};
+
 function GameLayer() {
     Layer.apply(this);
     this.done = false;
@@ -630,28 +653,18 @@ function GameLayer() {
 
     this.board.reset();
 
-    var tutorialPadding = 4;
-    var tutorialTextWidth = 320 - (this.board.x + (this.board.width / 2)) - tutorialPadding * 2;
-    var tutorialTextHeight = 24;
-    var tutorialDisplay = this.addEntity(new Entity(this.board.x + (this.board.width / 2) + tutorialPadding, 200 - tutorialTextHeight));
-    this.tutorialDisplay = tutorialDisplay;
-    var tutorialText = new Text('', tutorialTextHeight + 'px sans-serif', 0, 0, 'left', undefined, tutorialTextHeight);
-    tutorialDisplay.elements = [tutorialText];
-    var showTutorialText = function (text) { tutorialText.lines = Radius.wrapText(tutorialText.font, tutorialTextWidth, text) };
+    var tutorialDisplay = new TutorialDisplay(this.board.x + (this.board.width / 2), 200, 320 - (this.board.x + (this.board.width / 2)));
+    this.tutorialDisplay = this.addEntity(tutorialDisplay);
     this.tutorial = new Tutorial([
-        [this.started, function () {
-            tutorialDisplay.opacity = 1;
-            gameLayer.addEntity(tutorialDisplay);
-            showTutorialText('Move the green square using one of the following:\n\na) Arrow keys\n\nb) Clicking or pressing on the game board\n\nc) Using the touch joystick to the right of the game board.');
-        }],
-        [this.moved,                function () { showTutorialText('Score points by capturing the red square.\n\nThe faster you capture it, the more points you score.'); }],
-        [this.board.scoreUpdated,   function () { showTutorialText('Avoid the white squares!\n\nIf you hit a white square, the game will end.'); }],
-        [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated,   function () { }],
-        [this.board.scoreUpdated, function () { tutorialDisplay.opacity = 0; }]
+        [this.started, function () { tutorialDisplay.setText('Move the green square using one of the following:\n\na) Arrow keys\n\nb) Clicking or pressing on the game board\n\nc) Using the touch joystick to the right of the game board.'); }],
+        [this.moved, function () { tutorialDisplay.setText('Score points by capturing the red square.\n\nThe faster you capture it, the more points you score.'); }],
+        [this.board.scoreUpdated, function () { tutorialDisplay.setText('Avoid the white squares!\n\nIf you hit a white square, the game will end.'); }],
+        [this.board.scoreUpdated, function () { }],
+        [this.board.scoreUpdated, function () { }],
+        [this.board.scoreUpdated, function () { }],
+        [this.board.scoreUpdated, function () { }],
+        [this.board.scoreUpdated, function () { }],
+        [this.board.scoreUpdated, function () { tutorialDisplay.setText(null); }]
     ]);
 
     var display = this.display;
@@ -744,10 +757,10 @@ GameLayer.prototype.setDifficulty = function (difficulty) {
 };
 
 GameLayer.prototype.start = function (showTutorial) {
+    this.tutorialDisplay.setText(null);
     if (showTutorial) {
         this.tutorial.reset();
     } else {
-        this.tutorialDisplay.opacity = 0;
         this.tutorial.cancel();
     }
 
