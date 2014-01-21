@@ -368,9 +368,9 @@ Board.prototype.update = function (ms) {
     }
 };
 
-Board.prototype.setScore = function (score) {
+Board.prototype.setScore = function (score, internal) {
     this.score = score;
-    this.scoreUpdated.fire(score);
+    this.scoreUpdated.fire(score, internal);
 }
 
 Board.prototype.setPoints = function (points) {
@@ -381,7 +381,7 @@ Board.prototype.setPoints = function (points) {
 Board.prototype.reset = function () {
     this.paused = false;
     this.finishTimer = 0;
-    this.setScore(0);
+    this.setScore(0, true);
     this.children = [this.player, this.goal];
     this.resetGoal();
 };
@@ -399,10 +399,10 @@ function ValueDisplay(font, event, x, y, align, updatedCallback) {
     this.elements = [this.textElement];
     this.updatedCallback = updatedCallback;
     var valueDisplay = this;
-    event.addListener(function (value) {
+    event.addListener(function (value, skipCallback) {
         valueDisplay.textElement.text = '' + value;
 
-        if (valueDisplay.updatedCallback) {
+        if (valueDisplay.updatedCallback && !skipCallback) {
             valueDisplay.updatedCallback();
         }
     });
@@ -427,7 +427,6 @@ function Display(board) {
     var padding = (new Text('00', font)).getTotalWidth();
     var pointLabel = new Text('Points: ', font, board.x + board.width / 2 - padding, board.height / 2, 'right', 'bottom');
     this.elements = [scoreLabel, pointLabel];
-    // TODO: Don't add the effect when the game first starts
     this.children.push(this.scoreDisplay = new ValueDisplay(font, board.scoreUpdated, board.x - board.width / 2 + scoreLabel.getTotalWidth(), board.height / 2, 'left', addUpdateEffect));
     this.children.push(new ValueDisplay(font, board.pointsUpdated, board.x + board.width / 2, board.height / 2, 'right', addUpdateEffect));
 
@@ -476,7 +475,6 @@ Display.prototype.emphasizeScore = function (newHighScore) {
 };
 
 Display.prototype.reset = function () {
-    // TODO: Suppress effects?
     // TODO: There is some weird flashing when switching to a second game...
     this.highScoreEmphasis.opacity = 0;
     if (this.bigScore) {
