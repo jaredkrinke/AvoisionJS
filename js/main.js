@@ -482,17 +482,16 @@ Display.prototype.reset = function () {
     }
 };
 
-function AdaptiveJoystick(x1, y1, x2, y2) {
+function AdaptiveJoystick(x, y, x1, y1, x2, y2) {
     Entity.call(this);
     this.x1 = x1;
     this.y1 = y1;
     this.x2 = x2;
     this.y2 = y2;
-    // TODO: Use outlined circles instead?
-    this.outline = new Entity(0, 0, 64, 64);
-    this.outline.elements = [new Rectangle(-0.5, 0.5, 1, 1, 'gray')];
+    this.outline = new Entity(x, y, 64, 64);
+    this.outline.elements = [new Image('images/joystick.png', 'gray', -0.5, 0.5, 1, 1)];
     this.outline.opacity = 0.7;
-    this.reticle = new Entity(0, 0, 48, 48);
+    this.reticle = new Entity(x, y, 32, 32);
     this.reticle.elements = [new Rectangle(-0.05, 0.5, 0.1, 1), new Rectangle(-0.5, 0.05, 1, 0.1)];
 
     this.manipulationStarted = new Event();
@@ -500,7 +499,7 @@ function AdaptiveJoystick(x1, y1, x2, y2) {
     this.manipulationEnded = new Event();
 
     this.manipulationRunning = false;
-    this.children = [];
+    this.children = [this.outline, this.reticle];
 }
 
 // TODO: Rename the class and these two variables
@@ -515,19 +514,16 @@ AdaptiveJoystick.prototype.intersects = function (x, y) {
 AdaptiveJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     if (button == MouseButton.primary) {
         if (pressed) {
-            // Show the joystick
             this.outline.x = x;
             this.outline.y = y;
             this.reticle.x = x;
             this.reticle.y = y;
-            this.children.push(this.outline);
-            this.children.push(this.reticle);
 
             this.manipulationRunning = true;
             this.manipulationStarted.fire();
         } else {
-            // Hide the joystick
-            this.children.length = 0;
+            this.outline.x = this.reticle.x;
+            this.outline.y = this.reticle.y;
             this.manipulationRunning = false;
             this.manipulationEnded.fire();
         }
@@ -682,7 +678,8 @@ function GameLayer() {
     var gameLayer = this;
     var board = this.board;
     var bigDistance = this.board.width * 2; // Needs to be larger than width or height
-    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -10000, 10000, 10000));
+    var boardX2 = this.board.x + this.board.width / 2;
+    this.touchJoystick = this.addEntity(new AdaptiveJoystick(boardX2 + (320 - boardX2) / 2, -200, boardX2, -10000, 10000, 10000));
     this.touchJoystick.manipulationStarted.addListener(function () {
         gameLayer.touchManipulationInProgress = true;
     });
