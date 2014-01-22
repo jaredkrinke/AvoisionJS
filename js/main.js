@@ -475,7 +475,6 @@ Display.prototype.emphasizeScore = function (newHighScore) {
 };
 
 Display.prototype.reset = function () {
-    // TODO: There is some weird flashing when switching to a second game...
     this.highScoreEmphasis.opacity = 0;
     if (this.bigScore) {
         this.removeChild(this.bigScore);

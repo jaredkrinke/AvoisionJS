@@ -765,11 +765,17 @@ var Radius = new function () {
     // Single loop iteration
     var loop = function () {
         var activeLayer = list[0];
-        // TODO: Handle switching layers
         if (activeLayer) {
             // Handle input
+
+            // Send all events to this frame's activy layer; drop events if the layer changes. This is to avoid 
+            // sending multiple layer (and therefore focus)-changing events (e.g. submitting a high score multiple
+            // times).
+
             keySerializer.process(function (key, pressed) {
-                activeLayer.keyPressed(key, pressed);
+                if (activeLayer === list[0]) {
+                    activeLayer.keyPressed(key, pressed);
+                }
             });
 
             var mouseButtonPressed = activeLayer.mouseButtonPressed;
@@ -783,7 +789,7 @@ var Radius = new function () {
             Transform2D.scale(transform, scale, -scale, transform);
 
             mouseSerializer.process(function (button, pressed, globalX, globalY) {
-                if (mouseButtonPressed) {
+                if (mouseButtonPressed && activeLayer === list[0]) {
                     var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
@@ -791,7 +797,7 @@ var Radius = new function () {
                     activeLayer.mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
                 }
             }, function (globalX, globalY) {
-                if (mouseMoved) {
+                if (mouseMoved && activeLayer === list[0]) {
                     // TODO: Combine code with above
                     var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
                     var canvasX = canvasCoordinates[0];
@@ -801,13 +807,18 @@ var Radius = new function () {
                 }
             });
 
-            // Update entities and draw everything
+            // Update entities
             activeLayer.update();
+
+            // Check to see if the active layer changed
+            var lastActiveLayer = activeLayer;
+            activeLayer = list[0];
+
+            // Draw the frame with the top layer (which may have changed after input/updates)
             activeLayer.draw(canvas, context);
 
-            // If this layer got hidden during this frame, reset its timer
-            if (activeLayer.hidden) {
-                // TODO: This feels a bit like a hack... are there any downsides to this?
+            // If the original layer got hidden during this frame, reset its timer
+            if (lastActiveLayer.hidden) {
                 activeLayer.lastUpdate = undefined;
                 activeLayer.hidden = false;
             }
