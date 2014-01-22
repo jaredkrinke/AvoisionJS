@@ -482,7 +482,7 @@ Display.prototype.reset = function () {
     }
 };
 
-function AdaptiveJoystick(x, y, x1, y1, x2, y2) {
+function TouchJoystick(x, y, x1, y1, x2, y2) {
     Entity.call(this);
     this.x1 = x1;
     this.y1 = y1;
@@ -502,16 +502,15 @@ function AdaptiveJoystick(x, y, x1, y1, x2, y2) {
     this.children = [this.outline, this.reticle];
 }
 
-// TODO: Rename the class and these two variables
-AdaptiveJoystick.maxOffset = 48;
-AdaptiveJoystick.minOffset = 16;
-AdaptiveJoystick.prototype = Object.create(Entity.prototype);
+TouchJoystick.maxDistance = 48;
+TouchJoystick.inactiveDistance = 16;
+TouchJoystick.prototype = Object.create(Entity.prototype);
 
-AdaptiveJoystick.prototype.intersects = function (x, y) {
+TouchJoystick.prototype.intersects = function (x, y) {
     return (x >= this.x1 && x <= this.x2 && y >= this.y1 && y <= this.y2);
 };
 
-AdaptiveJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+TouchJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     if (button == MouseButton.primary) {
         if (pressed) {
             this.outline.x = x;
@@ -530,22 +529,22 @@ AdaptiveJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y)
     }
 };
 
-AdaptiveJoystick.prototype.mouseMoved = function (x, y) {
+TouchJoystick.prototype.mouseMoved = function (x, y) {
     if (this.manipulationRunning) {
         // Check to see if the distance is enough to register
         var dx = x - this.reticle.x;
         var dy = y - this.reticle.y;
         var distance = Math.sqrt(dx * dx + dy * dy);
         var angle = Math.atan2(dy, dx);
-        if (distance >= AdaptiveJoystick.minOffset) {
+        if (distance >= TouchJoystick.inactiveDistance) {
             this.manipulationUpdated.fire(angle);
         } else {
             this.manipulationUpdated.fire();
         }
 
         // Update the outline
-        this.outline.x = this.reticle.x + Math.min(distance, AdaptiveJoystick.maxOffset) * Math.cos(angle);
-        this.outline.y = this.reticle.y + Math.min(distance, AdaptiveJoystick.maxOffset) * Math.sin(angle);
+        this.outline.x = this.reticle.x + Math.min(distance, TouchJoystick.maxDistance) * Math.cos(angle);
+        this.outline.y = this.reticle.y + Math.min(distance, TouchJoystick.maxDistance) * Math.sin(angle);
     }
 };
 
@@ -679,7 +678,7 @@ function GameLayer() {
     var board = this.board;
     var bigDistance = this.board.width * 2; // Needs to be larger than width or height
     var boardX2 = this.board.x + this.board.width / 2;
-    this.touchJoystick = this.addEntity(new AdaptiveJoystick(boardX2 + (320 - boardX2) / 2, -200, boardX2, -10000, 10000, 10000));
+    this.touchJoystick = this.addEntity(new TouchJoystick(boardX2 + (320 - boardX2) / 2, -200, boardX2, -10000, 10000, 10000));
     this.touchJoystick.manipulationStarted.addListener(function () {
         gameLayer.touchManipulationInProgress = true;
     });
