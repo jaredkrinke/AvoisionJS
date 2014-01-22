@@ -756,39 +756,7 @@ function GameLayer() {
         enter: exitIfDone,
         space: exitIfDone,
         escape: exitIfDone
-};
-
-    // TODO: Why aren't these in the prototype instead?
-    this.mouseButtonPressed = function (button, pressed, x, y) {
-        if (button == MouseButton.primary) {
-            if (gameLayer.done) {
-                if (pressed) {
-                    gameLayer.endGame();
-                }
-            } else {
-                // Check to see if this should be routed to the touch joystick (i.e.g either a manipulation is running
-                // or this is a new interaction originating within the touch joystick's area)
-                if (gameLayer.touchManipulationInProgress || (pressed && gameLayer.touchJoystick.intersects(x, y))) {
-                    gameLayer.touchJoystick.mouseButtonPressed(button, pressed, x, y);
-                } else {
-                    if (pressed) {
-                        gameLayer.moved.fire();
-                        board.player.setTarget((x - board.x) / board.width, (y - board.y) / board.height);
-                    } else {
-                        board.player.clearTarget();
-                    }
-                }
-            }
-        }
     };
-
-    this.mouseMoved = function (x, y) {
-        if (gameLayer.touchManipulationInProgress) {
-            gameLayer.touchJoystick.mouseMoved(x, y);
-        } else {
-            board.player.updateTarget((x - board.x) / board.width, (y - board.y) / board.height);
-        }
-    }
 }
 
 GameLayer.prototype = Object.create(Layer.prototype);
@@ -820,6 +788,37 @@ GameLayer.prototype.endGame = function () {
     this.reset();
     this.done = true;
     Radius.popLayer();
+};
+
+GameLayer.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    if (button == MouseButton.primary) {
+        if (this.done) {
+            if (pressed) {
+                this.endGame();
+            }
+        } else {
+            // Check to see if this should be routed to the touch joystick (i.e.g either a manipulation is running
+            // or this is a new interaction originating within the touch joystick's area)
+            if (this.touchManipulationInProgress || (pressed && this.touchJoystick.intersects(x, y))) {
+                this.touchJoystick.mouseButtonPressed(button, pressed, x, y);
+            } else {
+                if (pressed) {
+                    this.moved.fire();
+                    this.board.player.setTarget((x - this.board.x) / this.board.width, (y - this.board.y) / this.board.height);
+                } else {
+                    this.board.player.clearTarget();
+                }
+            }
+        }
+    }
+};
+
+GameLayer.prototype.mouseMoved = function (x, y) {
+    if (this.touchManipulationInProgress) {
+        this.touchJoystick.mouseMoved(x, y);
+    } else {
+        this.board.player.updateTarget((x - this.board.x) / this.board.width, (y - this.board.y) / this.board.height);
+    }
 };
 
 Difficulty = {
