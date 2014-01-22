@@ -726,6 +726,12 @@ function GameLayer() {
         gameLayer.done = true;
     });
 
+    var exitIfDone = function (pressed) {
+        if (pressed && gameLayer.done) {
+            gameLayer.endGame();
+        }
+    };
+
     this.keyPressedHandlers = {
         left: function (pressed) {
             gameLayer.moved.fire();
@@ -747,13 +753,10 @@ function GameLayer() {
             board.player.setMovingDownState(pressed);
         },
 
-        enter: function (pressed) {
-            // TODO: Really, any key should be able to quit, but this will require modifying the event handling...
-            if (pressed && gameLayer.done) {
-                gameLayer.endGame();
-            }
-        }
-    };
+        enter: exitIfDone,
+        space: exitIfDone,
+        escape: exitIfDone
+};
 
     // TODO: Why aren't these in the prototype instead?
     this.mouseButtonPressed = function (button, pressed, x, y) {
