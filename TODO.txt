@@ -1,11 +1,10 @@
 ﻿Bugs:
 Show the current high score while a game is going on?
-
-Finishing off 1.0:
-Go through TODOs in the code
-Launch on http://avsn.sf.net/
+Have some sort of HTML5 canvas fallback
 
 Beyond 1.0:
+Go through TODOs in radius.js
+Go through TODOs in radius-ui.js
 High scores (include global persistence)
 Customizable controls?
 Music?

@@ -918,7 +918,6 @@ function StaticMenu(form) {
 
 StaticMenu.prototype = Object.create(FormLayer.prototype);
 
-// TODO: These should ideally be consolidated in an "inputReceived" handler
 StaticMenu.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     if (pressed) {
         Radius.popLayer();
