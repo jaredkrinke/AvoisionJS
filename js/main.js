@@ -687,8 +687,7 @@ function GameLayer() {
         board.player.clearTarget();
     });
     this.touchJoystick.manipulationUpdated.addListener(function (angle) {
-        // TODO: Should this be "angle !== undefined? I think it should...
-        if (angle) {
+        if (angle !== undefined) {
             gameLayer.moved.fire();
             gameLayer.board.player.setTarget(bigDistance * Math.cos(angle), bigDistance * Math.sin(angle));
         } else {
