@@ -1,5 +1,7 @@
 ﻿function Event() {
     this.callbacks = [];
+    // TODO: Consider refactoring this "lockable list" and using it for entities in Layer
+    this.locked = false;
 }
 
 Event.prototype = {
@@ -9,11 +11,44 @@ Event.prototype = {
         this.callbacks.push(callback);
     },
 
+    removeListener: function (callback) {
+        if (this.locked) {
+            // Queue the remove
+            if (this.pendingRemoval) {
+                this.pendingRemoval.push(callback);
+            } else {
+                this.pendingRemoval = [callback];
+            }
+        } else {
+            // Scan for the callback and remove it
+            for (var i = 0; i < this.callbacks.length; i++) {
+                if (this.callbacks[i] === callback) {
+                    this.callbacks.splice(i, 1);
+                    i--;
+                    break;
+                }
+            }
+        }
+    },
+
     fire: function () {
         var callbacks = this.callbacks;
         var length = callbacks.length;
+
+        // Lock the list of callbacks while iterating
+        this.locked = true;
         for (var i = 0; i < length; i++) {
             callbacks[i].apply(null, arguments);
+        }
+        this.locked = false;
+
+        if (this.pendingRemoval) {
+            // Process removes that occurred during iteration
+            length = this.pendingRemoval.length;
+            for (i = 0; i < length; i++) {
+                this.removeListener(this.pendingRemoval[i]);
+            }
+            this.pendingRemoval = null;
         }
     }
 };
@@ -89,8 +124,16 @@ var Transform2D = {
 };
 
 Audio = {
-    muted: false
 };
+
+(function () {
+    var key = 'radiusAudioMuted';
+    Audio.muted = localStorage[key] === 'true';
+    Audio.setMuted = function (muted) {
+        localStorage[key] = muted;
+        Audio.muted = muted;
+    };
+})();
 
 function AudioClip(source, frequent) {
     // Note: Internet Explorer 11 on Windows 7 seems to truncate MP3s that are less than 0.4s long, so make sure all
@@ -177,10 +220,20 @@ function Layer() {
 Layer.prototype = {
     constructor: Layer,
 
-    // TODO: Maybe just call the property children and let callers manipulate directly?
     addEntity: function (entity) {
         this.entities.push(entity);
         return entity;
+    },
+
+    removeEntity: function (entity) {
+        var entities = this.entities;
+        var entityCount = entities.length;
+        for (var i = 0; i < entityCount; i++) {
+            if (entities[i] === entity) {
+                entities.splice(i, 1);
+                break;
+            }
+        }
     },
 
     forEachEntity: function (f) {
@@ -201,6 +254,7 @@ Layer.prototype = {
                 ms = 50;
             }
 
+            // TODO: Need to lock the list of children
             this.forEachEntity(function (entity) {
                 if (entity.update) {
                     entity.update(ms);
@@ -222,7 +276,7 @@ Layer.prototype = {
 
     drawEntity: function (canvas, context, entity) {
         var opacity = (entity.opacity !== undefined ? entity.opacity : 1);
-        if (opacity > 0) {
+        if (opacity > 0 && (entity.elements || entity.children)) {
             context.save();
             context.translate(entity.x, entity.y);
 
@@ -266,14 +320,24 @@ Layer.prototype = {
                                 context.fillStyle = element.color;
                             }
 
-                            if (element instanceof Text && element.text) {
+                            if (element instanceof Text) {
                                 if (element.font) {
                                     context.font = element.font;
                                 }
 
                                 context.textBaseline = element.baseline;
                                 context.textAlign = element.align;
-                                context.fillText(element.text, element.x, -element.y);
+
+                                if (element.text) {
+                                    context.fillText(element.text, element.x, -element.y);
+                                } else if (element.lines) {
+                                    var lineCount = element.lines.length;
+                                    var offset = 0;
+                                    for (var l = 0; l < lineCount; l++) {
+                                        context.fillText(element.lines[l], element.x, -element.y + offset);
+                                        offset += element.lineHeight;
+                                    }
+                                }
                             } else {
                                 // Rectangle
                                 context.fillRect(element.x, -element.y, element.width, element.height);
@@ -341,13 +405,15 @@ function Image(source, color, x, y, width, height) {
     this.img.src = source;
 }
 
-function Text(text, font, x, y, align, baseline) {
+// TODO: Should this just take a height value instead of a font?
+function Text(text, font, x, y, align, baseline, lineHeight) {
     this.text = text;
     this.font = font;
     this.x = x || 0;
     this.y = y || 0;
     this.align = align || 'left';
     this.baseline = baseline || 'alphabetic';
+    this.lineHeight = lineHeight;
 }
 
 Text.prototype = {
@@ -711,11 +777,17 @@ var Radius = new function () {
     // Single loop iteration
     var loop = function () {
         var activeLayer = list[0];
-        // TODO: Handle switching layers
         if (activeLayer) {
             // Handle input
+
+            // Send all events to this frame's activy layer; drop events if the layer changes. This is to avoid 
+            // sending multiple layer (and therefore focus)-changing events (e.g. submitting a high score multiple
+            // times).
+
             keySerializer.process(function (key, pressed) {
-                activeLayer.keyPressed(key, pressed);
+                if (activeLayer === list[0]) {
+                    activeLayer.keyPressed(key, pressed);
+                }
             });
 
             var mouseButtonPressed = activeLayer.mouseButtonPressed;
@@ -729,7 +801,7 @@ var Radius = new function () {
             Transform2D.scale(transform, scale, -scale, transform);
 
             mouseSerializer.process(function (button, pressed, globalX, globalY) {
-                if (mouseButtonPressed) {
+                if (mouseButtonPressed && activeLayer === list[0]) {
                     var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
@@ -737,7 +809,7 @@ var Radius = new function () {
                     activeLayer.mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
                 }
             }, function (globalX, globalY) {
-                if (mouseMoved) {
+                if (mouseMoved && activeLayer === list[0]) {
                     // TODO: Combine code with above
                     var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
                     var canvasX = canvasCoordinates[0];
@@ -747,13 +819,18 @@ var Radius = new function () {
                 }
             });
 
-            // Update entities and draw everything
+            // Update entities
             activeLayer.update();
+
+            // Check to see if the active layer changed
+            var lastActiveLayer = activeLayer;
+            activeLayer = list[0];
+
+            // Draw the frame with the top layer (which may have changed after input/updates)
             activeLayer.draw(canvas, context);
 
-            // If this layer got hidden during this frame, reset its timer
-            if (activeLayer.hidden) {
-                // TODO: This feels a bit like a hack... are there any downsides to this?
+            // If the original layer got hidden during this frame, reset its timer
+            if (lastActiveLayer.hidden) {
                 activeLayer.lastUpdate = undefined;
                 activeLayer.hidden = false;
             }
@@ -787,5 +864,47 @@ var Radius = new function () {
         context.restore();
 
         return width;
+    }
+
+    this.wrapText = function (font, maxWidth, text) {
+        var lines = [];
+        var length = text.length;
+        var startIndex = 0;
+        var lastSeparator;
+        for (var i = 0; i <= length; i++) {
+            if (i === length || text[i] === ' ' || text[i] === '\n') {
+                if (i > startIndex) {
+                    var width = Radius.getTextWidth(font, text.slice(startIndex, i));
+                    if (width < maxWidth) {
+                        if (text[i] === '\n' || i === length) {
+                            lines.push(text.slice(startIndex, i));
+                            startIndex = i + 1;
+                        } else {
+                            // This line fit, so record this point in case we need to come back to it
+                            lastSeparator = i;
+                        }
+                    } else {
+                        // The line is too long, so go back to the previous separator
+                        if (lastSeparator) {
+                            lines.push(text.slice(startIndex, lastSeparator));
+                            startIndex = lastSeparator + 1;
+                            lastSeparator = null;
+
+                            // Now check this point again
+                            i--;
+                        } else {
+                            lines.push(text.slice(startIndex, i));
+                            startIndex = i + 1;
+                        }
+                    }
+                } else {
+                    startIndex = i + 1;
+                    if (text[i] === '\n') {
+                        lines.push('');
+                    }
+                }
+            }
+        }
+        return lines;
     }
 };

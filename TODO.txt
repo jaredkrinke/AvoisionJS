@@ -1,16 +1,13 @@
 ﻿Bugs:
-
-Finishing off 1.0:
-Notify the user when a new high score is set (or maybe show it during gameplay as well)
-High scores (include global persistence)
-Customizable controls?
-Improve the instructions (add images, maybe show them automatically on the first game)
-Option persistence
-Music?
-Go through TODOs in the code
-Launch on http://avsn.sf.net/
+Show the current high score while a game is going on?
+Have some sort of HTML5 canvas fallback
 
 Beyond 1.0:
+Go through TODOs in radius.js
+Go through TODOs in radius-ui.js
+High scores (include global persistence)
+Customizable controls?
+Music?
 Have a tutorial instead of a static instruction menu
 Optimize transformations
 Port to Windows 8?

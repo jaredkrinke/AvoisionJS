@@ -625,7 +625,7 @@ function NestedFixedForm(columnWidths, components) {
 
 NestedFixedForm.prototype = Object.create(FixedForm.prototype);
 
-function Choice(text, choices) {
+function Choice(text, choices, initialIndex) {
     var label = new Button(text + ': ');
     var leftArrow = new Label('< ');
     leftArrow.setColor(Button.disabledColor);
@@ -652,7 +652,7 @@ function Choice(text, choices) {
     // TODO: Colors
 
     this.first = true;
-    this.setIndex(0);
+    this.setIndex(initialIndex || 0);
 }
 
 Choice.prototype = Object.create(NestedFixedForm.prototype);
