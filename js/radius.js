@@ -1,5 +1,6 @@
 ﻿function Event() {
     this.callbacks = [];
+    // TODO: Consider refactoring this "lockable list" and using it for entities in Layer
     this.locked = false;
 }
 
@@ -219,10 +220,20 @@ function Layer() {
 Layer.prototype = {
     constructor: Layer,
 
-    // TODO: Maybe just call the property children and let callers manipulate directly?
     addEntity: function (entity) {
         this.entities.push(entity);
         return entity;
+    },
+
+    removeEntity: function (entity) {
+        var entities = this.entities;
+        var entityCount = entities.length;
+        for (var i = 0; i < entityCount; i++) {
+            if (entities[i] === entity) {
+                entities.splice(i, 1);
+                break;
+            }
+        }
     },
 
     forEachEntity: function (f) {
@@ -243,6 +254,7 @@ Layer.prototype = {
                 ms = 50;
             }
 
+            // TODO: Need to lock the list of children
             this.forEachEntity(function (entity) {
                 if (entity.update) {
                     entity.update(ms);

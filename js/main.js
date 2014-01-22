@@ -698,7 +698,7 @@ function GameLayer() {
     this.board.reset();
 
     var tutorialDisplay = new TutorialDisplay(this.board.x + (this.board.width / 2), 200, 320 - (this.board.x + (this.board.width / 2)));
-    this.tutorialDisplay = this.addEntity(tutorialDisplay);
+    this.tutorialDisplay = tutorialDisplay;
     this.tutorial = new Tutorial([
         [this.started, function () { tutorialDisplay.setText('Move the green square using one of the following:\n\na) Arrow keys\n\nb) Clicking or pressing on the game board\n\nc) Using the touch joystick to the right of the game board.'); }],
         [this.moved, function () { tutorialDisplay.setText('Score points by capturing the red square.\n\nThe faster you capture it, the more points you score.'); }],
@@ -772,12 +772,19 @@ GameLayer.prototype.setDifficulty = function (difficulty) {
 };
 
 GameLayer.prototype.start = function (showTutorial) {
-    // TODO: Only add the entity if there's going to be a tutorial
-    this.tutorialDisplay.clear();
     if (showTutorial) {
         this.tutorial.reset();
+        this.tutorialDisplay.clear();
+        if (!this.tutorialDisplayAdded) {
+            this.addEntity(this.tutorialDisplay);
+            this.tutorialDisplayAdded = true;
+        }
     } else {
         this.tutorial.cancel();
+        if (this.tutorialDisplayAdded) {
+            this.removeEntity(this.tutorialDisplay);
+            this.tutorialDisplayAdded = false;
+        }
     }
 
     this.started.fire();
