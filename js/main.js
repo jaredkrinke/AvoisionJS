@@ -981,12 +981,6 @@ function MainMenu() {
         mainMenu.difficulty = Difficulty.nameToLevel[difficultyName];
     });
 
-    var fullscreenOptions = ['Off', 'On'];
-    var fullscreenChoice = new Choice('Fullscreen', fullscreenOptions);
-    fullscreenChoice.choiceChanged.addListener(function (text) {
-        Radius.setFullscreen(text === fullscreenOptions[1]);
-    });
-
     var audioOptions = ['On', 'Muted'];
     var audioChoice = new Choice('Audio', audioOptions, Audio.muted ? 1 : 0);
     audioChoice.choiceChanged.addListener(function (text) {
@@ -995,22 +989,34 @@ function MainMenu() {
 
     var highScoresMenu = new HighScoresMenu();
     this.tutorialShown = localStorage['tutorialShown'] === 'true';
+    var options = [
+        new Separator(),
+        new Button('Start New Game', function () { mainMenu.startNewGame(!mainMenu.tutorialShown); }),
+        difficultyChoice,
+        audioChoice,
+        new Separator(),
+        new Button('Show High Scores', function () { Radius.pushLayer(highScoresMenu); }),
+        new Button('Learn How to Play', function () { mainMenu.startNewGame(true); })
+    ];
+
+    // Add the "fullscreen" choice, if necessary
+    var fullscreenOnly = RadiusSettings && RadiusSettings.fullscreenOnly;
+    if (!fullscreenOnly) {
+        var fullscreenOptions = ['Off', 'On'];
+        var fullscreenChoice = new Choice('Fullscreen', fullscreenOptions);
+        fullscreenChoice.choiceChanged.addListener(function (text) {
+            Radius.setFullscreen(text === fullscreenOptions[1]);
+        });
+        options.splice(3, 0, fullscreenChoice);
+    }
+
     FormLayer.call(this, new NestedGridForm(1, [
         new NestedCenterFlowForm(3, [
             new Title('Avoision'),
             new Label('  '),
             new Logo()
         ]),
-        new NestedFlowForm(1, [
-            new Separator(),
-            new Button('Start New Game', function () { mainMenu.startNewGame(!mainMenu.tutorialShown); }),
-            difficultyChoice,
-            fullscreenChoice,
-            audioChoice,
-            new Separator(),
-            new Button('Show High Scores', function () { Radius.pushLayer(highScoresMenu); }),
-            new Button('Learn How to Play', function () { mainMenu.startNewGame(true); })
-        ])
+        new NestedFlowForm(1, options)
     ]));
 }
 
@@ -1029,7 +1035,7 @@ MainMenu.prototype.startNewGame = function (showTutorial) {
     }
 };
 
-window.onload = function () {
+window.addEventListener('DOMContentLoaded', function () {
     Radius.initialize(document.getElementById('canvas'));
     Radius.start(new MainMenu());
-}
+});
