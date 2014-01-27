@@ -1,5 +1,6 @@
 ﻿function Event() {
     this.callbacks = [];
+    // TODO: Consider refactoring this "lockable list" and using it for entities in Layer
     this.locked = false;
 }
 
@@ -219,10 +220,20 @@ function Layer() {
 Layer.prototype = {
     constructor: Layer,
 
-    // TODO: Maybe just call the property children and let callers manipulate directly?
     addEntity: function (entity) {
         this.entities.push(entity);
         return entity;
+    },
+
+    removeEntity: function (entity) {
+        var entities = this.entities;
+        var entityCount = entities.length;
+        for (var i = 0; i < entityCount; i++) {
+            if (entities[i] === entity) {
+                entities.splice(i, 1);
+                break;
+            }
+        }
     },
 
     forEachEntity: function (f) {
@@ -243,6 +254,7 @@ Layer.prototype = {
                 ms = 50;
             }
 
+            // TODO: Need to lock the list of children
             this.forEachEntity(function (entity) {
                 if (entity.update) {
                     entity.update(ms);
@@ -679,6 +691,10 @@ function MouseSerializer(canvas) {
     };
 }
 
+var RadiusSettings = {
+    fullscreenOnly: false
+};
+
 var Radius = new function () {
     var keySerializer = new KeySerializer();
     var mouseSerializer;
@@ -765,11 +781,17 @@ var Radius = new function () {
     // Single loop iteration
     var loop = function () {
         var activeLayer = list[0];
-        // TODO: Handle switching layers
         if (activeLayer) {
             // Handle input
+
+            // Send all events to this frame's activy layer; drop events if the layer changes. This is to avoid 
+            // sending multiple layer (and therefore focus)-changing events (e.g. submitting a high score multiple
+            // times).
+
             keySerializer.process(function (key, pressed) {
-                activeLayer.keyPressed(key, pressed);
+                if (activeLayer === list[0]) {
+                    activeLayer.keyPressed(key, pressed);
+                }
             });
 
             var mouseButtonPressed = activeLayer.mouseButtonPressed;
@@ -783,7 +805,7 @@ var Radius = new function () {
             Transform2D.scale(transform, scale, -scale, transform);
 
             mouseSerializer.process(function (button, pressed, globalX, globalY) {
-                if (mouseButtonPressed) {
+                if (mouseButtonPressed && activeLayer === list[0]) {
                     var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
@@ -791,7 +813,7 @@ var Radius = new function () {
                     activeLayer.mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
                 }
             }, function (globalX, globalY) {
-                if (mouseMoved) {
+                if (mouseMoved && activeLayer === list[0]) {
                     // TODO: Combine code with above
                     var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
                     var canvasX = canvasCoordinates[0];
@@ -801,13 +823,18 @@ var Radius = new function () {
                 }
             });
 
-            // Update entities and draw everything
+            // Update entities
             activeLayer.update();
+
+            // Check to see if the active layer changed
+            var lastActiveLayer = activeLayer;
+            activeLayer = list[0];
+
+            // Draw the frame with the top layer (which may have changed after input/updates)
             activeLayer.draw(canvas, context);
 
-            // If this layer got hidden during this frame, reset its timer
-            if (activeLayer.hidden) {
-                // TODO: This feels a bit like a hack... are there any downsides to this?
+            // If the original layer got hidden during this frame, reset its timer
+            if (lastActiveLayer.hidden) {
                 activeLayer.lastUpdate = undefined;
                 activeLayer.hidden = false;
             }
@@ -823,6 +850,10 @@ var Radius = new function () {
 
         // Disable default touch behavior (e.g. pan/bounce) for the canvas
         canvas.setAttribute('style', 'touch-action: none;');
+
+        if (RadiusSettings.fullscreenOnly) {
+            Radius.setFullscreen(true);
+        }
     }
 
     this.start = function (layer) {

@@ -475,7 +475,6 @@ Display.prototype.emphasizeScore = function (newHighScore) {
 };
 
 Display.prototype.reset = function () {
-    // TODO: There is some weird flashing when switching to a second game...
     this.highScoreEmphasis.opacity = 0;
     if (this.bigScore) {
         this.removeChild(this.bigScore);
@@ -483,17 +482,16 @@ Display.prototype.reset = function () {
     }
 };
 
-function AdaptiveJoystick(x1, y1, x2, y2) {
+function TouchJoystick(x, y, x1, y1, x2, y2) {
     Entity.call(this);
     this.x1 = x1;
     this.y1 = y1;
     this.x2 = x2;
     this.y2 = y2;
-    // TODO: Use outlined circles instead?
-    this.outline = new Entity(0, 0, 64, 64);
-    this.outline.elements = [new Rectangle(-0.5, 0.5, 1, 1, 'gray')];
+    this.outline = new Entity(x, y, 64, 64);
+    this.outline.elements = [new Image('images/joystick.png', 'gray', -0.5, 0.5, 1, 1)];
     this.outline.opacity = 0.7;
-    this.reticle = new Entity(0, 0, 48, 48);
+    this.reticle = new Entity(x, y, 32, 32);
     this.reticle.elements = [new Rectangle(-0.05, 0.5, 0.1, 1), new Rectangle(-0.5, 0.05, 1, 0.1)];
 
     this.manipulationStarted = new Event();
@@ -501,56 +499,52 @@ function AdaptiveJoystick(x1, y1, x2, y2) {
     this.manipulationEnded = new Event();
 
     this.manipulationRunning = false;
-    this.children = [];
+    this.children = [this.outline, this.reticle];
 }
 
-// TODO: Rename the class and these two variables
-AdaptiveJoystick.maxOffset = 48;
-AdaptiveJoystick.minOffset = 16;
-AdaptiveJoystick.prototype = Object.create(Entity.prototype);
+TouchJoystick.maxDistance = 48;
+TouchJoystick.inactiveDistance = 16;
+TouchJoystick.prototype = Object.create(Entity.prototype);
 
-AdaptiveJoystick.prototype.intersects = function (x, y) {
+TouchJoystick.prototype.intersects = function (x, y) {
     return (x >= this.x1 && x <= this.x2 && y >= this.y1 && y <= this.y2);
 };
 
-AdaptiveJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+TouchJoystick.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     if (button == MouseButton.primary) {
         if (pressed) {
-            // Show the joystick
             this.outline.x = x;
             this.outline.y = y;
             this.reticle.x = x;
             this.reticle.y = y;
-            this.children.push(this.outline);
-            this.children.push(this.reticle);
 
             this.manipulationRunning = true;
             this.manipulationStarted.fire();
         } else {
-            // Hide the joystick
-            this.children.length = 0;
+            this.outline.x = this.reticle.x;
+            this.outline.y = this.reticle.y;
             this.manipulationRunning = false;
             this.manipulationEnded.fire();
         }
     }
 };
 
-AdaptiveJoystick.prototype.mouseMoved = function (x, y) {
+TouchJoystick.prototype.mouseMoved = function (x, y) {
     if (this.manipulationRunning) {
         // Check to see if the distance is enough to register
         var dx = x - this.reticle.x;
         var dy = y - this.reticle.y;
         var distance = Math.sqrt(dx * dx + dy * dy);
         var angle = Math.atan2(dy, dx);
-        if (distance >= AdaptiveJoystick.minOffset) {
+        if (distance >= TouchJoystick.inactiveDistance) {
             this.manipulationUpdated.fire(angle);
         } else {
             this.manipulationUpdated.fire();
         }
 
         // Update the outline
-        this.outline.x = this.reticle.x + Math.min(distance, AdaptiveJoystick.maxOffset) * Math.cos(angle);
-        this.outline.y = this.reticle.y + Math.min(distance, AdaptiveJoystick.maxOffset) * Math.sin(angle);
+        this.outline.x = this.reticle.x + Math.min(distance, TouchJoystick.maxDistance) * Math.cos(angle);
+        this.outline.y = this.reticle.y + Math.min(distance, TouchJoystick.maxDistance) * Math.sin(angle);
     }
 };
 
@@ -683,7 +677,8 @@ function GameLayer() {
     var gameLayer = this;
     var board = this.board;
     var bigDistance = this.board.width * 2; // Needs to be larger than width or height
-    this.touchJoystick = this.addEntity(new AdaptiveJoystick(this.board.x + this.board.width / 2, -10000, 10000, 10000));
+    var boardX2 = this.board.x + this.board.width / 2;
+    this.touchJoystick = this.addEntity(new TouchJoystick(boardX2 + (320 - boardX2) / 2, -200, boardX2, -10000, 10000, 10000));
     this.touchJoystick.manipulationStarted.addListener(function () {
         gameLayer.touchManipulationInProgress = true;
     });
@@ -692,8 +687,7 @@ function GameLayer() {
         board.player.clearTarget();
     });
     this.touchJoystick.manipulationUpdated.addListener(function (angle) {
-        // TODO: Should this be "angle !== undefined? I think it should...
-        if (angle) {
+        if (angle !== undefined) {
             gameLayer.moved.fire();
             gameLayer.board.player.setTarget(bigDistance * Math.cos(angle), bigDistance * Math.sin(angle));
         } else {
@@ -704,7 +698,7 @@ function GameLayer() {
     this.board.reset();
 
     var tutorialDisplay = new TutorialDisplay(this.board.x + (this.board.width / 2), 200, 320 - (this.board.x + (this.board.width / 2)));
-    this.tutorialDisplay = this.addEntity(tutorialDisplay);
+    this.tutorialDisplay = tutorialDisplay;
     this.tutorial = new Tutorial([
         [this.started, function () { tutorialDisplay.setText('Move the green square using one of the following:\n\na) Arrow keys\n\nb) Clicking or pressing on the game board\n\nc) Using the touch joystick to the right of the game board.'); }],
         [this.moved, function () { tutorialDisplay.setText('Score points by capturing the red square.\n\nThe faster you capture it, the more points you score.'); }],
@@ -732,6 +726,12 @@ function GameLayer() {
         gameLayer.done = true;
     });
 
+    var exitIfDone = function (pressed) {
+        if (pressed && gameLayer.done) {
+            gameLayer.endGame();
+        }
+    };
+
     this.keyPressedHandlers = {
         left: function (pressed) {
             gameLayer.moved.fire();
@@ -753,45 +753,10 @@ function GameLayer() {
             board.player.setMovingDownState(pressed);
         },
 
-        enter: function (pressed) {
-            // TODO: Really, any key should be able to quit, but this will require modifying the event handling...
-            if (pressed && gameLayer.done) {
-                gameLayer.endGame();
-            }
-        }
+        enter: exitIfDone,
+        space: exitIfDone,
+        escape: exitIfDone
     };
-
-    // TODO: Why aren't these in the prototype instead?
-    this.mouseButtonPressed = function (button, pressed, x, y) {
-        if (button == MouseButton.primary) {
-            if (gameLayer.done) {
-                if (pressed) {
-                    gameLayer.endGame();
-                }
-            } else {
-                // Check to see if this should be routed to the touch joystick (i.e.g either a manipulation is running
-                // or this is a new interaction originating within the touch joystick's area)
-                if (gameLayer.touchManipulationInProgress || (pressed && gameLayer.touchJoystick.intersects(x, y))) {
-                    gameLayer.touchJoystick.mouseButtonPressed(button, pressed, x, y);
-                } else {
-                    if (pressed) {
-                        gameLayer.moved.fire();
-                        board.player.setTarget((x - board.x) / board.width, (y - board.y) / board.height);
-                    } else {
-                        board.player.clearTarget();
-                    }
-                }
-            }
-        }
-    };
-
-    this.mouseMoved = function (x, y) {
-        if (gameLayer.touchManipulationInProgress) {
-            gameLayer.touchJoystick.mouseMoved(x, y);
-        } else {
-            board.player.updateTarget((x - board.x) / board.width, (y - board.y) / board.height);
-        }
-    }
 }
 
 GameLayer.prototype = Object.create(Layer.prototype);
@@ -807,12 +772,19 @@ GameLayer.prototype.setDifficulty = function (difficulty) {
 };
 
 GameLayer.prototype.start = function (showTutorial) {
-    // TODO: Only add the entity if there's going to be a tutorial
-    this.tutorialDisplay.clear();
     if (showTutorial) {
         this.tutorial.reset();
+        this.tutorialDisplay.clear();
+        if (!this.tutorialDisplayAdded) {
+            this.addEntity(this.tutorialDisplay);
+            this.tutorialDisplayAdded = true;
+        }
     } else {
         this.tutorial.cancel();
+        if (this.tutorialDisplayAdded) {
+            this.removeEntity(this.tutorialDisplay);
+            this.tutorialDisplayAdded = false;
+        }
     }
 
     this.started.fire();
@@ -823,6 +795,37 @@ GameLayer.prototype.endGame = function () {
     this.reset();
     this.done = true;
     Radius.popLayer();
+};
+
+GameLayer.prototype.mouseButtonPressed = function (button, pressed, x, y) {
+    if (button == MouseButton.primary) {
+        if (this.done) {
+            if (pressed) {
+                this.endGame();
+            }
+        } else {
+            // Check to see if this should be routed to the touch joystick (i.e.g either a manipulation is running
+            // or this is a new interaction originating within the touch joystick's area)
+            if (this.touchManipulationInProgress || (pressed && this.touchJoystick.intersects(x, y))) {
+                this.touchJoystick.mouseButtonPressed(button, pressed, x, y);
+            } else {
+                if (pressed) {
+                    this.moved.fire();
+                    this.board.player.setTarget((x - this.board.x) / this.board.width, (y - this.board.y) / this.board.height);
+                } else {
+                    this.board.player.clearTarget();
+                }
+            }
+        }
+    }
+};
+
+GameLayer.prototype.mouseMoved = function (x, y) {
+    if (this.touchManipulationInProgress) {
+        this.touchJoystick.mouseMoved(x, y);
+    } else {
+        this.board.player.updateTarget((x - this.board.x) / this.board.width, (y - this.board.y) / this.board.height);
+    }
 };
 
 Difficulty = {
@@ -915,7 +918,6 @@ function StaticMenu(form) {
 
 StaticMenu.prototype = Object.create(FormLayer.prototype);
 
-// TODO: These should ideally be consolidated in an "inputReceived" handler
 StaticMenu.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     if (pressed) {
         Radius.popLayer();
@@ -979,12 +981,6 @@ function MainMenu() {
         mainMenu.difficulty = Difficulty.nameToLevel[difficultyName];
     });
 
-    var fullscreenOptions = ['Off', 'On'];
-    var fullscreenChoice = new Choice('Fullscreen', fullscreenOptions);
-    fullscreenChoice.choiceChanged.addListener(function (text) {
-        Radius.setFullscreen(text === fullscreenOptions[1]);
-    });
-
     var audioOptions = ['On', 'Muted'];
     var audioChoice = new Choice('Audio', audioOptions, Audio.muted ? 1 : 0);
     audioChoice.choiceChanged.addListener(function (text) {
@@ -993,22 +989,34 @@ function MainMenu() {
 
     var highScoresMenu = new HighScoresMenu();
     this.tutorialShown = localStorage['tutorialShown'] === 'true';
+    var options = [
+        new Separator(),
+        new Button('Start New Game', function () { mainMenu.startNewGame(!mainMenu.tutorialShown); }),
+        difficultyChoice,
+        audioChoice,
+        new Separator(),
+        new Button('Show High Scores', function () { Radius.pushLayer(highScoresMenu); }),
+        new Button('Learn How to Play', function () { mainMenu.startNewGame(true); })
+    ];
+
+    // Add the "fullscreen" choice, if necessary
+    var fullscreenOnly = RadiusSettings && RadiusSettings.fullscreenOnly;
+    if (!fullscreenOnly) {
+        var fullscreenOptions = ['Off', 'On'];
+        var fullscreenChoice = new Choice('Fullscreen', fullscreenOptions);
+        fullscreenChoice.choiceChanged.addListener(function (text) {
+            Radius.setFullscreen(text === fullscreenOptions[1]);
+        });
+        options.splice(3, 0, fullscreenChoice);
+    }
+
     FormLayer.call(this, new NestedGridForm(1, [
         new NestedCenterFlowForm(3, [
             new Title('Avoision'),
             new Label('  '),
             new Logo()
         ]),
-        new NestedFlowForm(1, [
-            new Separator(),
-            new Button('Start New Game', function () { mainMenu.startNewGame(!mainMenu.tutorialShown); }),
-            difficultyChoice,
-            fullscreenChoice,
-            audioChoice,
-            new Separator(),
-            new Button('Show High Scores', function () { Radius.pushLayer(highScoresMenu); }),
-            new Button('Learn How to Play', function () { mainMenu.startNewGame(true); })
-        ])
+        new NestedFlowForm(1, options)
     ]));
 }
 
@@ -1027,7 +1035,7 @@ MainMenu.prototype.startNewGame = function (showTutorial) {
     }
 };
 
-window.onload = function () {
+window.addEventListener('DOMContentLoaded', function () {
     Radius.initialize(document.getElementById('canvas'));
     Radius.start(new MainMenu());
-}
+});
