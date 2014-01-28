@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/2010/manifest" xmlns:m2="http://schemas.microsoft.com/appx/2013/manifest">
-  <Identity Name="7885f482-1111-46bb-a506-3f29eb5a25fd" Version="1.0.0.0" Publisher="CN=jkrinke" />
+  <Identity Name="avoision" Version="1.0.0.0" Publisher="CN=jkrinke" />
   <Properties>
     <DisplayName>Avoision</DisplayName>
-    <PublisherDisplayName>jkrinke</PublisherDisplayName>
+    <PublisherDisplayName>Radius Engine</PublisherDisplayName>
     <Logo>images\storelogo.png</Logo>
   </Properties>
   <Prerequisites>

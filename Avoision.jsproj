@@ -55,6 +55,7 @@
     <AppxManifest Include="package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
+    <Content Include="images\joystick.png" />
     <Content Include="images\splashscreen.scale-100.jpg" />
     <Content Include="index.html" />
     <Content Include="images\background.jpg" />
