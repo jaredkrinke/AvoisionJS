@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/2010/manifest" xmlns:m2="http://schemas.microsoft.com/appx/2013/manifest">
-  <Identity Name="avoision" Version="1.0.0.0" Publisher="CN=jkrinke" />
+  <Identity Name="26556RadiusEngine.Avoision" Version="1.1.0.1" Publisher="CN=B0F70D24-2475-454B-A127-DED54D3C9D67" />
   <Properties>
     <DisplayName>Avoision</DisplayName>
     <PublisherDisplayName>Radius Engine</PublisherDisplayName>

@@ -49,12 +49,20 @@
     <RequiredPlatformVersion>8.1</RequiredPlatformVersion>
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <DefaultLanguage>en-US</DefaultLanguage>
-    <PackageCertificateKeyFile>Avoision_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <PackageCertificateKeyFile>Avoision_StoreKey.pfx</PackageCertificateKeyFile>
+    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+    <AppxBundlePlatforms>neutral</AppxBundlePlatforms>
+    <PackageCertificateThumbprint>90AED0F4553C30D3D5B7FE27978019A348EB03A3</PackageCertificateThumbprint>
   </PropertyGroup>
   <ItemGroup>
     <AppxManifest Include="package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
+    <Content Include="sounds\boom.mp3" />
+    <Content Include="sounds\bounce.mp3" />
+    <Content Include="sounds\score.mp3" />
+    <Content Include="sounds\select.mp3" />
+    <None Include="Avoision_StoreKey.pfx" />
     <Content Include="images\joystick.png" />
     <Content Include="images\splashscreen.scale-100.jpg" />
     <Content Include="index.html" />
@@ -69,6 +77,7 @@
     <Content Include="js\main.js" />
     <Content Include="js\radius-ui.js" />
     <Content Include="js\radius.js" />
+    <None Include="Package.StoreAssociation.xml" />
     <None Include="Avoision_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
