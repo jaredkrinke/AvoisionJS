@@ -691,6 +691,10 @@ function MouseSerializer(canvas) {
     };
 }
 
+var RadiusSettings = {
+    fullscreenOnly: false
+};
+
 var Radius = new function () {
     var keySerializer = new KeySerializer();
     var mouseSerializer;
@@ -846,6 +850,10 @@ var Radius = new function () {
 
         // Disable default touch behavior (e.g. pan/bounce) for the canvas
         canvas.setAttribute('style', 'touch-action: none;');
+
+        if (RadiusSettings.fullscreenOnly) {
+            Radius.setFullscreen(true);
+        }
     }
 
     this.start = function (layer) {
