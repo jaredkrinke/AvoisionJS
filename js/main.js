@@ -60,13 +60,13 @@ function Player() {
     Entity.call(this);
     this.v = [0, 0, 0, 0];
     this.target = [];
-    this.speed = 0.6 / 1000;
     this.width = 1 / 30;
     this.height = 1 / 30;
     this.elements = [Player.image];
 }
 
 Player.prototype = Object.create(Entity.prototype);
+Player.maxSpeed = 0.6 / 1000;
 Player.image = new Image('images/player.png', 'green');
 Player.prototype.setMovingUpState = function (pressed) {
     this.v[0] = pressed ? 1 : 0;
@@ -93,7 +93,17 @@ Player.prototype.updateTarget = function (x, y) {
     if (this.target.length > 0) {
         this.setTarget(x, y);
     }
-}
+};
+
+Player.prototype.setDirection = function (angle, speed) {
+    this.joystickAngle = angle;
+    this.joystickSpeed = speed;
+};
+
+Player.prototype.clearDirection = function () {
+    this.joystickAngle = undefined;
+    this.joystickSpeed = undefined;
+};
 
 Player.prototype.clearTarget = function () {
     this.target.length = 0;
@@ -105,6 +115,7 @@ Player.prototype.clearMovingStates = function () {
     this.v[2] = 0;
     this.v[3] = 0;
     this.clearTarget();
+    this.clearDirection();
 };
 
 Player.prototype.createGhost = function () {
@@ -112,41 +123,56 @@ Player.prototype.createGhost = function () {
 };
 
 Player.prototype.update = function (ms) {
+    // First check keyboard input
     var directionX = this.v[3] - this.v[2];
     var directionY = this.v[0] - this.v[1];
     var target = this.target;
-    if (directionX || directionY || target.length > 0) {
-        var direction;
-        if (target.length > 0) {
-            // Only move if we're a little ways from the target
-            var dx = target[0] - this.x;
-            var dy = target[1] - this.y;
-            if (Math.abs(dx) > this.width / 4 || Math.abs(dy) > this.height / 4) {
-                direction = Math.atan2(dy, dx);
+
+    // Now check for mouse/touch target
+    if (target.length > 0) {
+        // Only move if there is a decent amount of space to move
+        // TODO: This could recalculate the speed if the player is close to the target...
+        var dx = target[0] - this.x;
+        var dy = target[1] - this.y;
+        if (Math.abs(dx) > this.width / 4 || Math.abs(dy) > this.height / 4) {
+            directionX = dx;
+            directionY = dy;
+        }
+    }
+
+    // Set direction and speed based on the info so far
+    var direction;
+    var speed;
+    if (directionX || directionY) {
+        direction = Math.atan2(directionY, directionX);
+        speed = Player.maxSpeed;
+    }
+
+    // Finally, check angle/speed from the touch joystick
+    if (this.joystickAngle !== undefined && this.joystickSpeed) {
+        direction = this.joystickAngle;
+        speed = Player.maxSpeed * this.joystickSpeed;
+    }
+
+    // Now apply the angle and speed
+    if (direction !== undefined && speed) {
+        this.x += speed * ms * Math.cos(direction);
+        this.y += speed * ms * Math.sin(direction);
+
+        // Boundaries
+        if (Math.abs(this.x) + this.width / 2 > 0.5) {
+            if (this.x > 0) {
+                this.x = 0.5 - this.width / 2;
+            } else {
+                this.x = -0.5 + this.width / 2;
             }
-        } else {
-            direction = Math.atan2(directionY, directionX);
         }
 
-        if (direction !== undefined) {
-            this.x += this.speed * ms * Math.cos(direction);
-            this.y += this.speed * ms * Math.sin(direction);
-
-            // Boundaries
-            if (Math.abs(this.x) + this.width / 2 > 0.5) {
-                if (this.x > 0) {
-                    this.x = 0.5 - this.width / 2;
-                } else {
-                    this.x = -0.5 + this.width / 2;
-                }
-            }
-
-            if (Math.abs(this.y) + this.height / 2 > 0.5) {
-                if (this.y > 0) {
-                    this.y = 0.5 - this.height / 2;
-                } else {
-                    this.y = -0.5 + this.height / 2;
-                }
+        if (Math.abs(this.y) + this.height / 2 > 0.5) {
+            if (this.y > 0) {
+                this.y = 0.5 - this.height / 2;
+            } else {
+                this.y = -0.5 + this.height / 2;
             }
         }
     }
@@ -191,6 +217,7 @@ Board.prototype.resetGoal = function () {
     this.goal.y = position[1];
     this.setPoints(Board.pointProgression[0] * (this.difficulty + 1));
     this.timer = 0;
+    this.player.clearMovingStates();
 
     // The goal moves on hard
     this.goal.va = (this.difficulty >= Difficulty.nameToLevel.Hard ? Board.goalSpeed : 0);
@@ -502,8 +529,8 @@ function TouchJoystick(x, y, x1, y1, x2, y2) {
     this.children = [this.outline, this.reticle];
 }
 
-TouchJoystick.maxDistance = 48;
-TouchJoystick.inactiveDistance = 16;
+TouchJoystick.maxDistance = 64;
+TouchJoystick.inactiveDistance = 8;
 TouchJoystick.prototype = Object.create(Entity.prototype);
 
 TouchJoystick.prototype.intersects = function (x, y) {
@@ -534,17 +561,17 @@ TouchJoystick.prototype.mouseMoved = function (x, y) {
         // Check to see if the distance is enough to register
         var dx = x - this.reticle.x;
         var dy = y - this.reticle.y;
-        var distance = Math.sqrt(dx * dx + dy * dy);
+        var distance = Math.min(Math.sqrt(dx * dx + dy * dy), TouchJoystick.maxDistance);
         var angle = Math.atan2(dy, dx);
         if (distance >= TouchJoystick.inactiveDistance) {
-            this.manipulationUpdated.fire(angle);
+            this.manipulationUpdated.fire(angle, distance / TouchJoystick.maxDistance);
         } else {
             this.manipulationUpdated.fire();
         }
 
         // Update the outline
-        this.outline.x = this.reticle.x + Math.min(distance, TouchJoystick.maxDistance) * Math.cos(angle);
-        this.outline.y = this.reticle.y + Math.min(distance, TouchJoystick.maxDistance) * Math.sin(angle);
+        this.outline.x = this.reticle.x + distance * Math.cos(angle);
+        this.outline.y = this.reticle.y + distance * Math.sin(angle);
     }
 };
 
@@ -684,14 +711,14 @@ function GameLayer() {
     });
     this.touchJoystick.manipulationEnded.addListener(function () {
         gameLayer.touchManipulationInProgress = false;
-        board.player.clearTarget();
+        board.player.clearDirection();
     });
-    this.touchJoystick.manipulationUpdated.addListener(function (angle) {
+    this.touchJoystick.manipulationUpdated.addListener(function (angle, speed) {
         if (angle !== undefined) {
             gameLayer.moved.fire();
-            gameLayer.board.player.setTarget(bigDistance * Math.cos(angle), bigDistance * Math.sin(angle));
+            gameLayer.board.player.setDirection(angle, speed);
         } else {
-            gameLayer.board.player.clearTarget();
+            gameLayer.board.player.clearDirection();
         }
     });
 
