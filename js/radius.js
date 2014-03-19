@@ -849,7 +849,7 @@ var Radius = new function () {
         mouseSerializer = new MouseSerializer(canvas);
 
         // Disable default touch behavior (e.g. pan/bounce) for the canvas
-        canvas.setAttribute('style', 'touch-action: none;');
+        canvas.setAttribute('style', 'touch-action: none; -ms-touch-action: none;');
 
         if (RadiusSettings.fullscreenOnly) {
             Radius.setFullscreen(true);
