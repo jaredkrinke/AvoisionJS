@@ -217,7 +217,6 @@ Board.prototype.resetGoal = function () {
     this.goal.y = position[1];
     this.setPoints(Board.pointProgression[0] * (this.difficulty + 1));
     this.timer = 0;
-    this.player.clearMovingStates();
 
     // The goal moves on hard
     this.goal.va = (this.difficulty >= Difficulty.nameToLevel.Hard ? Board.goalSpeed : 0);
@@ -411,6 +410,7 @@ Board.prototype.reset = function () {
     this.setScore(0, true);
     this.children = [this.player, this.goal];
     this.resetGoal();
+    this.player.clearMovingStates();
 };
 
 Board.prototype.setDifficulty = function (difficulty) {
