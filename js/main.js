@@ -324,15 +324,15 @@ Board.prototype.addEnemy = function () {
     // Animate in the new enemy
     var enemy = new Enemy(position[0], position[1], size, size, speedX, speedY);
     var board = this;
-    this.children.push(new Ghost(enemy, 500, 0, true, function () {
-        board.children.push(enemy);
+    this.addChild(new Ghost(enemy, 500, 0, true, function () {
+        board.addChild(enemy);
     }));
 };
 
 Board.prototype.lose = function () {
     Board.loseClip.play();
     this.player.clearMovingStates();
-    this.children.push(this.player.createGhost());
+    this.addChild(this.player.createGhost());
     this.removeChild(this.player);
     this.paused = true;
     this.finishTimer = this.timer + Board.transitionPeriod;
@@ -342,7 +342,7 @@ Board.prototype.lose = function () {
 Board.prototype.captureGoal = function () {
     Goal.clip.play();
     this.setScore(this.score + this.points);
-    this.children.push(this.goal.createGhost());
+    this.addChild(this.goal.createGhost());
     this.resetGoal();
     this.addEnemy();
 };
@@ -373,16 +373,13 @@ Board.prototype.update = function (ms) {
         }
 
         // Check for enemy intersection
-        var childCount = this.children.length;
-        for (var i = 0; i < childCount; i++) {
-            var child = this.children[i];
-            if (child instanceof Enemy) {
+        this.children.forEach(function (child) {
+            if (!done && child instanceof Enemy) {
                 if (this.checkCollision(this.player, child)) {
                     done = true;
-                    break;
                 }
             }
-        }
+        }, this);
 
         if (done) {
             this.lose();
@@ -408,7 +405,9 @@ Board.prototype.reset = function () {
     this.paused = false;
     this.finishTimer = 0;
     this.setScore(0, true);
-    this.children = [this.player, this.goal];
+    this.clearChildren();
+    this.addChild(this.player);
+    this.addChild(this.goal);
     this.resetGoal();
     this.player.clearMovingStates();
 };
@@ -440,22 +439,21 @@ ValueDisplay.prototype = Object.create(Entity.prototype);
 function Display(board) {
     Entity.apply(this);
     this.board = board;
-    this.children = [];
 
     var font = '32px sans-serif';
     var textHeight = 32;
     var display = this;
     var addUpdateEffect = function () {
         var sign = (this.align === 'right') ? 1 : -1;
-        display.children.push(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
+        display.addChild(new Ghost(this, 150, 2, undefined, undefined, sign * this.textElement.getTotalWidth() / 2, -textHeight / 2));
     }
 
     var scoreLabel = new Text('Score: ', font, board.x - board.width / 2, board.height / 2, 'left', 'bottom');
     var padding = (new Text('00', font)).getTotalWidth();
     var pointLabel = new Text('Points: ', font, board.x + board.width / 2 - padding, board.height / 2, 'right', 'bottom');
     this.elements = [scoreLabel, pointLabel];
-    this.children.push(this.scoreDisplay = new ValueDisplay(font, board.scoreUpdated, board.x - board.width / 2 + scoreLabel.getTotalWidth(), board.height / 2, 'left', addUpdateEffect));
-    this.children.push(new ValueDisplay(font, board.pointsUpdated, board.x + board.width / 2, board.height / 2, 'right', addUpdateEffect));
+    this.addChild(this.scoreDisplay = new ValueDisplay(font, board.scoreUpdated, board.x - board.width / 2 + scoreLabel.getTotalWidth(), board.height / 2, 'left', addUpdateEffect));
+    this.addChild(new ValueDisplay(font, board.pointsUpdated, board.x + board.width / 2, board.height / 2, 'right', addUpdateEffect));
 
     this.font = font;
     this.textHeight = textHeight;
@@ -470,7 +468,7 @@ function Display(board) {
     background.opacity = 0.85;
     this.highScoreEmphasis = new Entity(board.x, board.y - this.textHeight * 2, 1, 1);
     this.highScoreEmphasis.elements = [background, textElement];
-    this.children.push(this.highScoreEmphasis);
+    this.addChild(this.highScoreEmphasis);
 }
 
 Display.prototype = Object.create(Entity.prototype);
@@ -494,7 +492,7 @@ Display.prototype.emphasizeScore = function (newHighScore) {
     var display = this;
     var ended = newHighScore ? function () { display.emphasizeHighScore(); } : undefined;
 
-    this.children.push(this.bigScore = new ScriptedEntity([background, textElement],
+    this.addChild(this.bigScore = new ScriptedEntity([background, textElement],
         [[0, this.board.x - this.board.width / 2 + this.textHeight / 2, this.board.height / 2, 1, 1, 0, 1],
          [1000, this.board.x - textWidth * scaleMax / 2, this.board.y, scaleMax, scaleMax, 0, 1]],
          false,
@@ -526,7 +524,8 @@ function TouchJoystick(x, y, x1, y1, x2, y2) {
     this.manipulationEnded = new Event();
 
     this.manipulationRunning = false;
-    this.children = [this.outline, this.reticle];
+    this.addChild(this.outline);
+    this.addChild(this.reticle);
 }
 
 TouchJoystick.maxDistance = 64;
@@ -699,6 +698,7 @@ function GameLayer() {
     this.display = this.addEntity(new Display(this.board));
     this.started = new Event();
     this.moved = new Event();
+    this.activeTouchIdentifier = null;
 
     // Touch controls
     var gameLayer = this;
@@ -855,6 +855,31 @@ GameLayer.prototype.mouseMoved = function (x, y) {
     }
 };
 
+GameLayer.prototype.touchMoved = function (identifier, x, y) {
+    if (this.activeTouchIdentifier === identifier) {
+        this.mouseMoved(x, y);
+    }
+};
+
+GameLayer.prototype.touched = function (identifier, started, x, y) {
+    if (this.activeTouchIdentifier === null && started) {
+        this.activeTouchIdentifier = identifier;
+    }
+
+    if (this.activeTouchIdentifier === identifier) {
+        this.mouseButtonPressed(MouseButton.primary, started, x, y);
+    }
+};
+
+GameLayer.prototype.touchCanceled = function (identifier) {
+    if (this.activeTouchIdentifier === identifier) {
+        this.activeTouchIdentifier = null;
+
+        // Interpret as a "mouse button up"
+        this.mouseButtonPressed(MouseButton.primary, false, x, y);
+    }
+};
+
 Difficulty = {
     levelToName: ['Easy', 'Normal', 'Hard'],
     nameToLevel: {
@@ -879,30 +904,28 @@ function Logo() {
 
     var background = new Entity(0.5, -0.5, 0.95, 0.95);
     background.elements = [Board.image];
-    this.children = [
-        background,
-        new ScriptedEntity([Player.image], [
+    this.addChild(background);
+    this.addChild(new ScriptedEntity([Player.image], [
             [0, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
-        ], true),
-        new ScriptedEntity([Goal.image], [
+        ], true));
+    this.addChild(new ScriptedEntity([Goal.image], [
             [0, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
-        ], true),
-        new ScriptedEntity([Enemy.image], [
+        ], true));
+    this.addChild(new ScriptedEntity([Enemy.image], [
             [0, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX2, chaseY2, chaseSize, chaseSize, 0, 1],
             [chasePeriod / 4, chaseX, chaseY2, chaseSize, chaseSize, 0, 1],
-        ], true),
-    ];
+        ], true));
 }
 
 Logo.prototype = Object.create(Entity.prototype);

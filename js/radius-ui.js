@@ -625,7 +625,7 @@ function NestedFixedForm(columnWidths, components) {
 
 NestedFixedForm.prototype = Object.create(FixedForm.prototype);
 
-function Choice(text, choices, initialIndex) {
+function Choice(text, choices, initialIndex, maxIndex) {
     var label = new Button(text + ': ');
     var leftArrow = new Label('< ');
     leftArrow.setColor(Button.disabledColor);
@@ -651,23 +651,35 @@ function Choice(text, choices, initialIndex) {
     this.choice = choices[0];
     // TODO: Colors
 
+    this.setMaxIndex((maxIndex !== undefined) ? maxIndex : choices.length - 1);
     this.first = true;
     this.setIndex(initialIndex || 0);
 }
 
 Choice.prototype = Object.create(NestedFixedForm.prototype);
 
-Choice.prototype.setIndex = function (index) {
+Choice.prototype.setMaxIndex = function (maxIndex) {
+    this.maxIndex = maxIndex;
+
+    // Set the index again to update arrows
+    this.setIndexInternal(this.index);
+};
+
+Choice.prototype.setIndexInternal = function (index) {
     this.index = index;
     this.choice = this.choices[index];
 
     // Update UI
     this.itemComponent.setText(this.choices[index]);
     this.leftArrow.opacity = (index === 0 ? 0 : 1);
-    this.rightArrow.opacity = (index === this.choices.length - 1 ? 0 : 1);
+    this.rightArrow.opacity = (index === this.maxIndex ? 0 : 1);
 
     // Notify
     this.choiceChanged.fire(this.choice);
+};
+
+Choice.prototype.setIndex = function (index) {
+    this.setIndexInternal(index);
 
     // Play a sound
     if (!this.first) {
@@ -687,7 +699,7 @@ Choice.prototype.movedLeft = function () {
 };
 
 Choice.prototype.movedRight = function () {
-    if (this.index < this.choices.length - 1) {
+    if (this.index < this.maxIndex) {
         this.setIndex(this.index + 1);
     }
 
@@ -730,7 +742,7 @@ Choice.prototype.mouseButtonPressed = function (button, pressed, x, y) {
         var choice = this;
         this.routePosition(x, y,
             function () { newIndex = Math.max(0, choice.index - 1); },
-            function () { newIndex = Math.min(choice.choices.length - 1, choice.index + 1); },
+            function () { newIndex = Math.min(choice.maxIndex, choice.index + 1); },
             function () { },
             function () { }
             );
@@ -746,14 +758,21 @@ Choice.prototype.mouseButtonPressed = function (button, pressed, x, y) {
 };
 
 Choice.prototype.activated = function () {
-    var newIndex = (this.index + 1) % this.choices.length;
+    var newIndex = (this.index + 1) % (this.maxIndex + 1);
     if (newIndex !== this.index) {
         this.setIndex(newIndex);
     }
 };
 
-function FormLayer(form) {
+function FormLayer(form, background) {
     Layer.apply(this);
+
+    // Add background first
+    if (background) {
+        this.addEntity(background);
+    }
+
+    // Add form
     this.form = form;
     form.setLayer(this);
     form.focused();
@@ -783,4 +802,8 @@ FormLayer.prototype.mouseMoved = function (x, y) {
 
 FormLayer.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     return this.form.mouseButtonPressed(button, pressed, x, y);
+};
+
+FormLayer.prototype.touched = function (identifier, pressed, x, y) {
+    return this.form.mouseButtonPressed(MouseButton.primary, pressed, x, y);
 };
