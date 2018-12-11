@@ -792,6 +792,7 @@ GameLayer.prototype.reset = function () {
     this.done = false;
     this.board.reset();
     this.display.reset();
+    this.activeTouchIdentifier = null;
 };
 
 GameLayer.prototype.setDifficulty = function (difficulty) {
