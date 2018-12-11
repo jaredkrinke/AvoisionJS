@@ -867,6 +867,10 @@ GameLayer.prototype.touched = function (identifier, started, x, y) {
     }
 
     if (this.activeTouchIdentifier === identifier) {
+        if (!started) {
+            this.activeTouchIdentifier = null;
+        }
+        
         this.mouseButtonPressed(MouseButton.primary, started, x, y);
     }
 };
