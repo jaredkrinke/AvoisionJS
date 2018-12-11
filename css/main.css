@@ -1,24 +1,3 @@
 ﻿body {
-    background-color: #101010;
-    color: #e0e0e0;
-    font: 10pt sans-serif;
+    background-color: #202020;
 }
-
-div.box {
-    width: 640px;
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 1em;
-    background-color: #404040;
-
-    border-width: 1pt;
-    border-style: solid;
-    border-color: #808080;
-}
-
-div.box p {
-    margin: 1em;
-}
-
-a:link { color: #ffffff; }
-a:visited { color: #e0e0e0; }
