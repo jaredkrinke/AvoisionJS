@@ -974,6 +974,12 @@ StaticMenu.prototype.mouseButtonPressed = function (button, pressed, x, y) {
     }
 };
 
+StaticMenu.prototype.touched = function (identifier, started, x, y) {
+    if (started) {
+        Radius.popLayer();
+    }
+};
+
 StaticMenu.prototype.keyPressed = function (key, pressed) {
     if (pressed) {
         Radius.popLayer();
