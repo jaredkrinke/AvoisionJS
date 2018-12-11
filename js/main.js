@@ -1022,6 +1022,37 @@ HighScoresMenu.prototype.formShown = function () {
     }
 };
 
+function ProgressBar(x, y, width, height, color) {
+    Entity.call(this, x, y, width, height);
+    this.bar = new Rectangle(-0.5, 0.5, 0, 1, color);
+    this.elements = [new Rectangle(-0.5, 0.5, 1, 1, 'darkgray'), this.bar];
+}
+
+ProgressBar.prototype = Object.create(Entity.prototype);
+
+ProgressBar.prototype.setProgress = function (progress) {
+    this.bar.width = progress;
+};
+
+function LoadingLayer(background) {
+    Layer.call(this);
+    // TODO: This layer may not need to be constantly redrawn
+    this.bar = new ProgressBar(0, 0, 640, 100, 'gray');
+    if (background) {
+        this.addEntity(background);
+    }
+    this.addEntity(this.bar);
+}
+
+LoadingLayer.prototype = Object.create(Layer.prototype);
+
+LoadingLayer.prototype.load = function (loadPromise, start) {
+    var loadingLayer = this;
+    loadPromise.then(start, null, function (progress) {
+        loadingLayer.bar.setProgress(progress);
+    });
+};
+
 function MainMenu() {
     this.gameLayer = new GameLayer();
 
@@ -1087,5 +1118,27 @@ MainMenu.prototype.startNewGame = function (showTutorial) {
 
 window.addEventListener('DOMContentLoaded', function () {
     Radius.initialize(document.getElementById('canvas'));
-    Radius.start(new MainMenu());
+
+    // These images must be loaded to show the menu, so load them first
+    var menuLoadPromise = Radius.images.load([
+        'images/enemy.png',
+        'images/goal.png',
+        'images/player.png',
+        'images/background.jpg'
+    ]);
+
+    // Show the main menu once critical images have loaded
+    var loadingLayer = new LoadingLayer();
+    Radius.start(loadingLayer);
+    loadingLayer.load(menuLoadPromise, function () {
+        // Now start loading everything else
+        var loadPromise = Radius.images.load([
+            'images/joystick.png',
+            'images/score.png'
+        ]);
+
+        // Show the main menu
+        Radius.popLayer();
+        Radius.pushLayer(new MainMenu(loadPromise));
+    });
 });
