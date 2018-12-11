@@ -1,6 +1,102 @@
-﻿function Event() {
+﻿function LockingList() {
+    // TODO: Should "locked" be a counter instead?
+    this.locked = false;
+    this.items = [];
+    this.pendingActions = [];
+}
+
+LockingList.action = {
+    append: 0,
+    remove: 1,
+    clear: 2
+};
+
+// TODO: Consider making the internal versions hidden
+LockingList.prototype.appendInternal = function (item) {
+    this.items.push(item);
+};
+
+LockingList.prototype.append = function (item) {
+    if (this.locked) {
+        this.pendingActions.push({ type: LockingList.action.append, item: item });
+    } else {
+        this.appendInternal(item);
+    }
+};
+
+LockingList.prototype.removeInternal = function (item) {
+    var index = this.items.indexOf(item);
+    if (index >= 0) {
+        this.items.splice(index, 1);
+    }
+};
+
+LockingList.prototype.remove = function (item) {
+    if (this.locked) {
+        this.pendingActions.push({ type: LockingList.action.remove, item: item });
+    } else {
+        this.removeInternal(item);
+    }
+};
+
+LockingList.prototype.getCount = function () {
+    return this.items.length;
+};
+
+LockingList.prototype.lock = function () {
+    this.locked = true;
+};
+
+LockingList.prototype.unlock = function () {
+    if (this.locked) {
+        // Process any queued actions on unlock
+        var count = this.pendingActions.length;
+        for (var i = 0; i < count; i++) {
+            var action = this.pendingActions[i];
+            switch (action.type) {
+                case LockingList.action.append:
+                    this.appendInternal(action.item);
+                    break;
+
+                case LockingList.action.remove:
+                    this.removeInternal(action.item);
+                    break;
+
+                case LockingList.action.clear:
+                    this.clearInternal();
+                    break;
+            }
+        }
+        this.pendingActions.length = 0;
+    }
+
+    this.locked = false;
+};
+
+LockingList.prototype.forEach = function (callback, that) {
+    this.lock();
+    var count = this.items.length;
+    for (var i = 0; i < count; i++) {
+        callback.call(that, this.items[i]);
+    }
+    this.unlock();
+};
+
+LockingList.prototype.clearInternal = function () {
+    this.items.length = 0;
+}
+
+LockingList.prototype.clear = function () {
+    if (this.locked) {
+        this.pendingActions.push({ type: LockingList.action.clear });
+    } else {
+        this.clearInternal();
+    }
+};
+
+function Event() {
     this.callbacks = [];
-    // TODO: Consider refactoring this "lockable list" and using it for entities in Layer
+    // TODO: Use LockingList here
     this.locked = false;
 }
 
@@ -210,38 +306,28 @@ var keyCodeToName = {
     38: 'up',
     39: 'right',
     40: 'down',
+    90: 'z'
 };
 
 // Layer that contains entities to display/update
 function Layer() {
-    this.entities = [];
+    this.entities = new LockingList();
 }
 
 Layer.prototype = {
     constructor: Layer,
 
     addEntity: function (entity) {
-        this.entities.push(entity);
+        this.entities.append(entity);
         return entity;
     },
 
     removeEntity: function (entity) {
-        var entities = this.entities;
-        var entityCount = entities.length;
-        for (var i = 0; i < entityCount; i++) {
-            if (entities[i] === entity) {
-                entities.splice(i, 1);
-                break;
-            }
-        }
+        this.entities.remove(entity);
     },
 
     forEachEntity: function (f) {
-        var entities = this.entities;
-        var entityCount = entities.length;
-        for (var i = 0; i < entityCount; i++) {
-            f(entities[i]);
-        }
+        this.entities.forEach(f);
     },
 
     update: function () {
@@ -254,10 +340,16 @@ Layer.prototype = {
                 ms = 50;
             }
 
-            // TODO: Need to lock the list of children
-            this.forEachEntity(function (entity) {
-                if (entity.update) {
-                    entity.update(ms);
+            // Update entities
+            var layer = this;
+            this.entities.forEach(function (child) {
+                if (child.update) {
+                    child.update(ms);
+                }
+
+                // Check to see if this child should be removed
+                if (child.dead) {
+                    layer.removeEntity(child);
                 }
             });
         }
@@ -312,8 +404,30 @@ Layer.prototype = {
                             context.globalAlpha *= elementOpacity;
                         }
 
-                        if (element instanceof Image && element.loaded) {
-                            context.drawImage(element.img, element.x, -element.y, element.width, element.height);
+                        if (element instanceof Image && element.image && element.image.loaded && element.width && element.height) {
+                            if (element.angle) {
+                                context.translate(element.x, -element.y);
+                                context.scale(element.width, element.height);
+                                // Rotate around the center
+                                context.translate(0.5, 0.5);
+                                context.rotate(element.angle);
+                                context.translate(-0.5, -0.5);
+                                if (element instanceof ImageRegion) {
+                                    var imgWidth = element.image.element.width;
+                                    var imgHeight = element.image.element.height;
+                                    context.drawImage(element.image.element, element.sx / imgWidth, element.sy / imgHeight, element.swidth / imgWidth, element.sheight / imgHeight, 0, 0, 1, 1);
+                                } else {
+                                    context.drawImage(element.image.element, 0, 0, 1, 1);
+                                }
+                            } else {
+                                if (element instanceof ImageRegion) {
+                                    var imgWidth = element.image.element.width;
+                                    var imgHeight = element.image.element.height;
+                                    context.drawImage(element.image.element, element.sx * imgWidth, element.sy * imgHeight, element.swidth * imgWidth, element.sheight * imgHeight, element.x, -element.y, element.width, element.height);
+                                } else {
+                                    context.drawImage(element.image.element, element.x, -element.y, element.width, element.height);
+                                }
+                            }
                         } else {
                             // Color is only supported for text/shapes
                             if (element.color) {
@@ -338,9 +452,19 @@ Layer.prototype = {
                                         offset += element.lineHeight;
                                     }
                                 }
-                            } else {
+                            } else if (element.width && element.height) {
                                 // Rectangle
-                                context.fillRect(element.x, -element.y, element.width, element.height);
+                                if (element.angle) {
+                                    context.translate(element.x, -element.y);
+                                    context.scale(element.width, element.height);
+                                    // Rotate around the center
+                                    context.translate(0.5, 0.5);
+                                    context.rotate(element.angle);
+                                    context.translate(-0.5, -0.5);
+                                    context.fillRect(-0.5, -0.5, 1, 1);
+                                } else {
+                                    context.fillRect(element.x, -element.y, element.width, element.height);
+                                }
                             }
                         }
 
@@ -351,10 +475,9 @@ Layer.prototype = {
 
             // Draw children
             if (entity.children) {
-                var childCount = entity.children.length;
-                for (var i = 0; i < childCount; i++) {
-                    Layer.prototype.drawEntity(canvas, context, entity.children[i]);
-                }
+                entity.forEachChild(function (child) {
+                    Layer.prototype.drawEntity(canvas, context, child);
+                });
             }
 
             context.restore();
@@ -376,6 +499,23 @@ Layer.prototype = {
         });
 
         context.restore();
+
+        // By default, cover up the areas outside the normal coordinate system
+        // TODO: Add some way to override this behavior--it may not be needed everywhere
+        var widthFactor = canvas.width / 640;
+        var heightFactor = canvas.height / 480;
+        context.fillStyle = 'black';
+        if (widthFactor > heightFactor) {
+            // Landscape
+            var overlayWidth = Math.ceil((canvas.width - canvas.height * 4 / 3) / 2);
+            context.fillRect(0, 0, overlayWidth, canvas.height);
+            context.fillRect(canvas.width - overlayWidth, 0, canvas.width, canvas.height);
+        } else if (widthFactor < heightFactor) {
+            // Portrait
+            var overlayHeight = Math.ceil((canvas.height - canvas.width * 3 / 4) / 2);
+            context.fillRect(0, 0, canvas.width, overlayHeight);
+            context.fillRect(0, canvas.height - overlayHeight, canvas.width, canvas.height);
+        }
     }
 };
 
@@ -387,23 +527,28 @@ function Rectangle(x, y, width, height, color) {
     this.color = color;
 }
 
-function Image(source, color, x, y, width, height) {
+function Image(source, color, x, y, width, height, opacity) {
     this.x = (x !== undefined ? x : -0.5);
     this.y = (y !== undefined ? y : 0.5);
     this.width = width || 1;
     this.height = height || 1;
     this.color = color;
+    this.opacity = opacity;
     this.loaded = false;
 
-    // Load the image
-    this.img = document.createElement('img');
-    var image = this;
-    this.img.onload = function () {
-        image.loaded = true;
-    };
-
-    this.img.src = source;
+    // Get the image entry from the cache
+    this.image = Radius.images.get(source);
 }
+
+function ImageRegion(source, color, sx, sy, swidth, sheight, x, y, width, height, opacity) {
+    Image.call(this, source, color, x, y, width, height, opacity);
+    this.sx = sx;
+    this.sy = sy;
+    this.swidth = swidth;
+    this.sheight = sheight;
+}
+
+ImageRegion.prototype = Object.create(Image.prototype);
 
 // TODO: Should this just take a height value instead of a font?
 function Text(text, font, x, y, align, baseline, lineHeight) {
@@ -437,36 +582,59 @@ function Entity(x, y, width, height) {
 Entity.prototype = {
     constructor: Entity,
 
+    addChild: function (child) {
+        if (!this.children) {
+            this.children = new LockingList();
+        }
+
+        this.children.append(child);
+    },
+
+    addChildren: function (children) {
+        var count = children.length;
+        for (var i = 0; i < count; i++) {
+            this.addChild(children[i]);
+        }
+    },
+
     removeChild: function (child) {
         if (this.children) {
-            var childCount = this.children.length;
-            for (var i = 0; i < childCount; i++) {
-                if (child === this.children[i]) {
-                    this.children.splice(i, 1);
-                }
-            }
+            this.children.remove(child);
+        }
+    },
+
+    clearChildren: function () {
+        if (this.children) {
+            this.children.clear();
+        }
+    },
+
+    forEachChild: function (f, that) {
+        if (this.children) {
+            this.children.forEach(f, that);
         }
     },
 
     updateChildren: function (ms) {
         if (this.children) {
-            var childCount = this.children.length;
-            for (var i = 0; i < childCount; i++) {
-                var child = this.children[i];
+            this.children.forEach(function (child) {
                 if (child.update) {
                     child.update(ms);
                 }
 
                 // Check to see if this child should be removed
                 if (child.dead) {
-                    this.removeChild(child);
-
-                    // Update loop variables to account for the removed child
-                    childCount--;
-                    i--;
+                    this.children.remove(child);
                 }
-            }
+            }, this);
         }
+    },
+
+    getChildCount: function () {
+        if (this.children) {
+            return this.children.getCount();
+        }
+        return 0;
     },
 
     update: function (ms) {
@@ -499,6 +667,7 @@ function ScriptedEntity(entityOrElements, steps, repeat, endedCallback) {
     this.opacity = steps[0][6];
 }
 
+// TODO: These aren't always used, so consider moving them to a library file or something
 ScriptedEntity.prototype = Object.create(Entity.prototype);
 
 ScriptedEntity.prototype.update = function (ms) {
@@ -630,7 +799,8 @@ function KeySerializer() {
 var MouseEvent = {
     down: 1,
     up: 2,
-    move: 3
+    move: 3,
+    out: 4
 };
 
 var MouseButton = {
@@ -667,7 +837,13 @@ function MouseSerializer(canvas) {
         queuedMousePayloads.push([e.clientX, e.clientY]);
     });
 
-    this.process = function (mouseButtonPressed, mouseMoved) {
+    canvas.addEventListener('mouseout', function (e) {
+        disableDefault(e);
+        queuedMouseEvents.push(MouseEvent.out);
+        queuedMousePayloads.push([]);
+    });
+
+    this.process = function (mouseButtonPressed, mouseMoved, mouseOut) {
         var count = queuedMouseEvents.length;
         if (count > 0) {
             for (var i = 0; i < count; i++) {
@@ -682,6 +858,10 @@ function MouseSerializer(canvas) {
                     case MouseEvent.move:
                         mouseMoved(payload[0], payload[1]);
                         break;
+
+                    case MouseEvent.out:
+                        mouseOut();
+                        break;
                 }
             }
 
@@ -691,6 +871,158 @@ function MouseSerializer(canvas) {
     };
 }
 
+var TouchEvent = {
+    start: 1,
+    end: 2,
+    move: 3,
+    cancel: 4
+};
+
+function TouchSerializer(canvas) {
+    var queuedEvents = [];
+    var queuedPayloads = [];
+    var disableDefault = function (e) {
+        // Disable the default action since the layer will handle this event
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+    }
+
+    canvas.addEventListener('touchstart', function (e) {
+        disableDefault(e);
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            queuedEvents.push(TouchEvent.start);
+            queuedPayloads.push([touch.clientX, touch.clientY, touch.identifier]);
+        }
+    });
+
+    canvas.addEventListener('touchmove', function (e) {
+        disableDefault(e);
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            queuedEvents.push(TouchEvent.move);
+            queuedPayloads.push([touch.clientX, touch.clientY, touch.identifier]);
+        }
+    });
+
+    canvas.addEventListener('touchend', function (e) {
+        disableDefault(e);
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            queuedEvents.push(TouchEvent.end);
+            queuedPayloads.push([touch.clientX, touch.clientY, touch.identifier]);
+        }
+    });
+
+    canvas.addEventListener('touchcancel', function (e) {
+        disableDefault(e);
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            queuedEvents.push(TouchEvent.cancel);
+            queuedPayloads.push([touch.identifier]);
+        }
+    });
+
+    this.process = function (touched, touchMoved, touchCanceled) {
+        var count = queuedEvents.length;
+        if (count > 0) {
+            for (var i = 0; i < count; i++) {
+                var event = queuedEvents[i];
+                var payload = queuedPayloads[i];
+                switch (event) {
+                    case TouchEvent.start:
+                    case TouchEvent.end:
+                        touched(payload[2], event == TouchEvent.start, payload[0], payload[1]);
+                        break;
+
+                    case TouchEvent.move:
+                        touchMoved(payload[2], payload[0], payload[1]);
+                        break;
+
+                    case TouchEvent.cancel:
+                        touchCanceled(payload[0]);
+                        break;
+                }
+            }
+
+            queuedEvents.length = 0;
+            queuedPayloads.length = 0;
+        }
+    };
+}
+
+function ImageCache() {
+    this.cache = {};
+}
+
+ImageCache.prototype.get = function (source) {
+    // TODO: Retrieve the image on demand?
+    var entry = this.cache[source];
+    if (!entry) {
+        entry = { loaded: false };
+        this.cache[source] = entry;
+    }
+    return entry;
+};
+
+ImageCache.prototype.load = function (sources) {
+    // Initialize count of images to load
+    var batchCount = sources.length;
+    var completedCount = 0;
+    var handlers = {};
+    var imageCache = this;
+    for (var i = 0; i < batchCount; i++) {
+        (function (i) {
+            // Ensure an entry in the cache exists
+            // TODO: Handle multiple requests to load the same image?
+            var source = sources[i];
+            var entry = imageCache.get(source);
+
+            var image = document.createElement('img');
+            entry.element = image;
+
+            // Setup image-loading callbacks
+            // TODO: Error handler
+            image.onload = function () {
+                // Make the image as loaded
+                entry.loaded = true;
+
+                // Call handlers, if provided
+                if (++completedCount === batchCount) {
+                    // Fulfilled
+                    handler = handlers.fulfilled;
+                    if (handler) {
+                        handler();
+                    }
+                } else {
+                    // Progress made
+                    handler = handlers.progress;
+                    if (handler) {
+                        handler(completedCount / batchCount);
+                    }
+                }
+            };
+
+            // Start loading the image
+            image.src = source;
+        })(i);
+    }
+
+    return {
+        then: function (fulfilledHandler, errorHandler, progressHandler) {
+            // Check to see if we're already done
+            if (completedCount === batchCount) {
+                fulfilledHandler();
+            } else {
+                // Setup handlers since we're not done yet
+                handlers.fulfilled = fulfilledHandler;
+                handlers.progress = progressHandler;
+            }
+        }
+    };
+};
+
 var RadiusSettings = {
     fullscreenOnly: false
 };
@@ -698,9 +1030,12 @@ var RadiusSettings = {
 var Radius = new function () {
     var keySerializer = new KeySerializer();
     var mouseSerializer;
+    var touchSerializer;
     var list = [];
     var canvas;
     var context;
+
+    this.images = new ImageCache();
 
     this.pushLayer = function (layer) {
         // Mark the current top layer as being hidden
@@ -796,6 +1131,11 @@ var Radius = new function () {
 
             var mouseButtonPressed = activeLayer.mouseButtonPressed;
             var mouseMoved = activeLayer.mouseMoved;
+            var mouseOut = activeLayer.mouseOut;
+
+            var touched = activeLayer.touched;
+            var touchMoved = activeLayer.touchMoved;
+            var touchCanceled = activeLayer.touchCanceled;
 
             // TODO: This could be cached and should also share code with the canvas 
             // TODO: The API here is ugly...
@@ -810,6 +1150,7 @@ var Radius = new function () {
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
                     var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                    this.lastMouseCoordinates = localCoordinates;
                     activeLayer.mouseButtonPressed(button, pressed, localCoordinates[0], localCoordinates[1]);
                 }
             }, function (globalX, globalY) {
@@ -819,7 +1160,37 @@ var Radius = new function () {
                     var canvasX = canvasCoordinates[0];
                     var canvasY = canvasCoordinates[1];
                     var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                    this.lastMouseCoordinates = localCoordinates;
                     activeLayer.mouseMoved(localCoordinates[0], localCoordinates[1]);
+                }
+            }, function () {
+                if (mouseOut && activeLayer === list[0]) {
+                    activeLayer.mouseOut();
+                }
+            });
+
+            touchSerializer.process(function (identifier, started, globalX, globalY) {
+                if (touched && activeLayer === list[0]) {
+                    var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
+                    var canvasX = canvasCoordinates[0];
+                    var canvasY = canvasCoordinates[1];
+                    var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                    this.lastMouseCoordinates = localCoordinates;
+                    activeLayer.touched(identifier, started, localCoordinates[0], localCoordinates[1]);
+                }
+            }, function (identifier, globalX, globalY) {
+                if (touchMoved && activeLayer === list[0]) {
+                    // TODO: Combine code with above
+                    var canvasCoordinates = convertToCanvasCoordinates(globalX, globalY);
+                    var canvasX = canvasCoordinates[0];
+                    var canvasY = canvasCoordinates[1];
+                    var localCoordinates = Transform2D.transform(transform, [canvasX, canvasY]);
+                    this.lastMouseCoordinates = localCoordinates;
+                    activeLayer.touchMoved(identifier, localCoordinates[0], localCoordinates[1]);
+                }
+            }, function (identifier) {
+                if (touchCanceled && activeLayer === list[0]) {
+                    activeLayer.touchCanceled(identifier);
                 }
             });
 
@@ -829,6 +1200,21 @@ var Radius = new function () {
             // Check to see if the active layer changed
             var lastActiveLayer = activeLayer;
             activeLayer = list[0];
+
+            // Update cursor, if needed
+            var cursor = activeLayer.cursor || 'auto';
+            if (this.lastMouseCoordinates) {
+                // Check and see if the mouse is inside the canvas but outside the normal coordinate system
+                var mouseX = this.lastMouseCoordinates[0];
+                var mouseY = this.lastMouseCoordinates[1];
+                if (mouseX < -320 || mouseX > 320 || mouseY < -240 || mouseY > 240) {
+                    // Mouse is outside normal coordinate system, so force the cursor to be shown
+                    cursor = 'auto';
+                }
+            }
+            if (canvas.style.cursor !== cursor) {
+                canvas.style.cursor = cursor;
+            }
 
             // Draw the frame with the top layer (which may have changed after input/updates)
             activeLayer.draw(canvas, context);
@@ -847,6 +1233,7 @@ var Radius = new function () {
         canvas = targetCanvas;
         context = canvas.getContext('2d');
         mouseSerializer = new MouseSerializer(canvas);
+        touchSerializer = new TouchSerializer(canvas);
 
         // Disable default touch behavior (e.g. pan/bounce) for the canvas
         canvas.setAttribute('style', 'touch-action: none; -ms-touch-action: none;');
