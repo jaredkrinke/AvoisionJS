@@ -770,7 +770,7 @@ function Ghost(entity, period, scaleMax, inward, endedCallback, offsetX2, offset
 Ghost.prototype = Object.create(ScriptedEntity.prototype);
 
 // Serializes key presses so that they show up predictably between frames
-function KeySerializer() {
+function KeySerializer(canvas) {
     var queuedKeyCodes = [];
     var queuedKeyStates = [];
     var disableDefault = function (e) {
@@ -779,7 +779,7 @@ function KeySerializer() {
         }
     };
 
-    window.addEventListener('keydown', function (e) {
+    canvas.addEventListener('keydown', function (e) {
         if (e.keyCode in keyCodeToName) {
             disableDefault(e);
             queuedKeyCodes.push(e.keyCode);
@@ -787,7 +787,7 @@ function KeySerializer() {
         }
     }, false);
 
-    window.addEventListener('keyup', function (e) {
+    canvas.addEventListener('keyup', function (e) {
         if (e.keyCode in keyCodeToName) {
             disableDefault(e);
             queuedKeyCodes.push(e.keyCode);
@@ -827,7 +827,7 @@ function MouseSerializer(canvas) {
     var queuedMousePayloads = [];
     var disableDefault = function (e) {
         // Propagate the event if this window doesn't have focus (this is needed to support keyboard input when hosted within an iframe)
-        var neededForFocus = (document.activeElement && document.activeElement !== window && document.activeElement !== document.body);
+        var neededForFocus = (document.activeElement && document.activeElement !== canvas);
 
         // Disable the default action since the layer will handle this event
         if (e.preventDefault && !neededForFocus) {
@@ -1250,7 +1250,7 @@ var Radius = new function () {
     this.initialize = function (targetCanvas) {
         canvas = targetCanvas;
         context = canvas.getContext('2d');
-        keySerializer = new KeySerializer();
+        keySerializer = new KeySerializer(canvas);
         mouseSerializer = new MouseSerializer(canvas);
         touchSerializer = new TouchSerializer(canvas);
 
