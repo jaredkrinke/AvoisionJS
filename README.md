@@ -6,4 +6,4 @@ Avoision JS is a simple arcade game that runs in your browser. You control the g
 Play it here:
 https://jaredkrinke.itch.io/avoisionjs
 
-![Screenshot](../web/web/AvoisionCover.jpg?raw=true)
+[![Screenshot](../web/web/AvoisionCover.jpg?raw=true)](https://jaredkrinke.itch.io/avoisionjs)
